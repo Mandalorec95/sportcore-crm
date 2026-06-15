@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  coach
+  parent
+}
+
+enum AthleteStatus {
+  trial
+  active
+  frozen
+  archived
+}
+
+enum AthleteLevel {
+  beginner
+  intermediate
+  advanced
+  competitive
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  sick
+  competition
+}
+
+enum PaymentStatus {
+  paid
+  partial
+  debt
+  pending
+}
+
+enum DocumentType {
+  medical_cert
+  insurance
+  parental_consent
+}
+
+enum DocumentStatus {
+  valid
+  expires_soon
+  expired
+}
+
+enum MedalType {
+  gold
+  silver
+  bronze
+  none
+}
+
+enum NotificationType {
+  payment_debt
+  doc_expiring
+  training
+  competition
+  progress
+}
+
+enum SessionStatus {
+  planned
+  completed
+  cancelled
+}
+
+enum Weekday {
+  mon
+  tue
+  wed
+  thu
+  fri
+  sat
+  sun
+}
+
+enum ParentRelation {
+  mother
+  father
+  guardian
+}
+
+model Organization {
+  id         String   @id @default(uuid())
+  name       String
+  sportTypes String[] @map("sport_types")
+  city       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  users         User[]
+  athletes      Athlete[]
+  groups        TrainingGroup[]
+  competitions  Competition[]
+  notifications Notification[]
+  apiKeys       ApiKey[]
+  payments      Payment[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         UserRole
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  org           Organization   @relation(fields: [orgId], references: [id])
+  coach         Coach?
+  parent        Parent?
+  notifications Notification[] @relation("NotificationRecipient")
+  attendances   Attendance[]   @relation("AttendanceCreator")
+
+  @@map("users")
+}
+
+model Athlete {
+  id        String        @id @default(uuid())
+  orgId     String        @map("org_id")
+  firstName String        @map("first_name")
+  lastName  String        @map("last_name")
+  birthDate DateTime      @map("birth_date") @db.Date
+  sportType String?       @map("sport_type")
+  level     AthleteLevel  @default(beginner)
+  status    AthleteStatus @default(trial)
+  groupId   String?       @map("group_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  org                Organization        @relation(fields: [orgId], references: [id])
+  group              TrainingGroup?      @relation(fields: [groupId], references: [id])
+  athleteParents     AthleteParent[]
+  attendances        Attendance[]
+  payments           Payment[]
+  medicalDocuments   MedicalDocument[]
+  competitionResults CompetitionResult[]
+  progressRecords    ProgressRecord[]
+
+  @@map("athletes")
+}
+
+model Parent {
+  id       String         @id @default(uuid())
+  userId   String         @unique @map("user_id")
+  orgId    String         @map("org_id")
+  phone    String?
+  relation ParentRelation @default(mother)
+
+  user           User            @relation(fields: [userId], references: [id])
+  athleteParents AthleteParent[]
+
+  @@map("parents")
+}
+
+model AthleteParent {
+  id        String  @id @default(uuid())
+  athleteId String  @map("athlete_id")
+  parentId  String  @map("parent_id")
+  isPrimary Boolean @default(true) @map("is_primary")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  parent  Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, parentId])
+  @@map("athlete_parents")
+}
+
+model Coach {
+  id         String   @id @default(uuid())
+  userId     String   @unique @map("user_id")
+  orgId      String   @map("org_id")
+  sportTypes String[] @map("sport_types")
+
+  user            User              @relation(fields: [userId], references: [id])
+  groups          TrainingGroup[]
+  sessions        TrainingSession[]
+  progressRecords ProgressRecord[]
+
+  @@map("coaches")
+}
+
+model TrainingGroup {
+  id         String  @id @default(uuid())
+  orgId      String  @map("org_id")
+  name       String
+  sportType  String? @map("sport_type")
+  coachId    String? @map("coach_id")
+  ageFrom    Int?    @map("age_from")
+  ageTo      Int?    @map("age_to")
+  capacity   Int     @default(20)
+  level      String?
+  monthlyFee Float?  @map("monthly_fee")
+
+  org       Organization    @relation(fields: [orgId], references: [id])
+  coach     Coach?          @relation(fields: [coachId], references: [id])
+  athletes  Athlete[]
+  schedules Schedule[]
+  sessions  TrainingSession[]
+
+  @@map("training_groups")
+}
+
+model Schedule {
+  id        String  @id @default(uuid())
+  groupId   String  @map("group_id")
+  weekday   Weekday
+  startTime String  @map("start_time")
+  endTime   String  @map("end_time")
+  location  String?
+
+  group TrainingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("schedules")
+}
+
+model TrainingSession {
+  id          String        @id @default(uuid())
+  groupId     String        @map("group_id")
+  coachId     String?       @map("coach_id")
+  sessionDate DateTime      @map("session_date") @db.Date
+  startTime   String        @map("start_time")
+  endTime     String        @map("end_time")
+  location    String?
+  status      SessionStatus @default(planned)
+  topic       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  group       TrainingGroup @relation(fields: [groupId], references: [id])
+  coach       Coach?        @relation(fields: [coachId], references: [id])
+  attendances Attendance[]
+
+  @@map("training_sessions")
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  sessionId String           @map("session_id")
+  athleteId String           @map("athlete_id")
+  status    AttendanceStatus
+  comment   String?
+  createdBy String?          @map("created_by")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  session  TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  athlete  Athlete         @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  creator  User?           @relation("AttendanceCreator", fields: [createdBy], references: [id])
+
+  @@unique([sessionId, athleteId])
+  @@map("attendance")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  athleteId     String        @map("athlete_id")
+  orgId         String        @map("org_id")
+  periodMonth   String        @map("period_month")
+  amount        Float
+  paidAmount    Float         @default(0) @map("paid_amount")
+  dueDate       DateTime?     @map("due_date") @db.Date
+  status        PaymentStatus @default(pending)
+  paymentDate   DateTime?     @map("payment_date")
+  paymentMethod String?       @map("payment_method")
+  note          String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  athlete Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  org     Organization @relation(fields: [orgId], references: [id])
+
+  @@map("payments")
+}
+
+model MedicalDocument {
+  id         String         @id @default(uuid())
+  athleteId  String         @map("athlete_id")
+  docType    DocumentType   @map("doc_type")
+  issuedAt   DateTime?      @map("issued_at") @db.Date
+  validUntil DateTime       @map("valid_until") @db.Date
+  fileUrl    String?        @map("file_url")
+  status     DocumentStatus @default(valid)
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("medical_documents")
+}
+
+model Competition {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  name        String
+  compDate    DateTime @map("comp_date") @db.Date
+  location    String?
+  sportType   String?  @map("sport_type")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  org     Organization        @relation(fields: [orgId], references: [id])
+  results CompetitionResult[]
+
+  @@map("competitions")
+}
+
+model CompetitionResult {
+  id            String    @id @default(uuid())
+  competitionId String    @map("competition_id")
+  athleteId     String    @map("athlete_id")
+  discipline    String?
+  category      String?
+  place         Int?
+  result        String?
+  medal         MedalType @default(none)
+  coachComment  String?   @map("coach_comment")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  athlete     Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("competition_results")
+}
+
+model ProgressRecord {
+  id         String   @id @default(uuid())
+  athleteId  String   @map("athlete_id")
+  coachId    String?  @map("coach_id")
+  skillName  String   @map("skill_name")
+  score      Int
+  comment    String?
+  measuredAt DateTime @map("measured_at") @db.Date
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  coach   Coach?  @relation(fields: [coachId], references: [id])
+
+  @@map("progress_records")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  orgId       String           @map("org_id")
+  recipientId String           @map("recipient_id")
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false) @map("is_read")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  recipient User         @relation("NotificationRecipient", fields: [recipientId], references: [id])
+
+  @@map("notifications")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  orgId      String    @map("org_id")
+  name       String
+  keyHash    String    @unique @map("key_hash")
+  keyPrefix  String    @map("key_prefix")
+  scopes     String[]
+  isActive   Boolean   @default(true) @map("is_active")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id])
+
+  @@map("api_keys")
+}
