@@ -166,6 +166,78 @@ export const deleteApiKey = (id: string) =>
 export const getCoaches = () =>
   api.get('/coaches').then((r) => r.data);
 
+// Groups
+export const createGroup = (data: Record<string, unknown>) =>
+  api.post('/groups', data).then((r) => r.data);
+
+export const updateGroup = (id: string, data: Record<string, unknown>) =>
+  api.patch(`/groups/${id}`, data).then((r) => r.data);
+
+export const deleteGroup = (id: string) =>
+  api.delete(`/groups/${id}`).then((r) => r.data);
+
+export const addGroupMember = (groupId: string, athleteId: string) =>
+  api.post(`/groups/${groupId}/members`, { athleteId }).then((r) => r.data);
+
+export const removeGroupMember = (groupId: string, athleteId: string) =>
+  api.delete(`/groups/${groupId}/members/${athleteId}`).then((r) => r.data);
+
+// Tasks
+export const getTasks = () =>
+  api.get('/tasks').then((r) => r.data);
+
+export const createTask = (data: Record<string, unknown>) =>
+  api.post('/tasks', data).then((r) => r.data);
+
+export const updateTask = (id: string, data: Record<string, unknown>) =>
+  api.patch(`/tasks/${id}`, data).then((r) => r.data);
+
+export const deleteTask = (id: string) =>
+  api.delete(`/tasks/${id}`).then((r) => r.data);
+
+// Users/Participants
+export const getUsers = () =>
+  api.get('/users').then((r) => r.data);
+
+export const createUser = (data: Record<string, unknown>) =>
+  api.post('/users', data).then((r) => r.data);
+
+export const updateUser = (id: string, data: Record<string, unknown>) =>
+  api.patch(`/users/${id}`, data).then((r) => r.data);
+
+export const deleteUser = (id: string) =>
+  api.delete(`/users/${id}`).then((r) => r.data);
+
+export const generateUserPassword = (id: string) =>
+  api.post(`/users/${id}/generate-password`).then((r) => r.data);
+
+export const updateMyProfile = (data: Record<string, unknown>) =>
+  api.patch('/users/profile', data).then((r) => r.data);
+
+export const changeMyPassword = (newPassword: string) =>
+  api.patch('/users/change-password', { newPassword }).then((r) => r.data);
+
+// Athlete attendance with grades
+export const getAthleteAttendanceStats = (id: string) =>
+  api.get(`/athletes/${id}/attendance-stats`).then((r) => r.data);
+
 // Parent
 export const getMyChildren = () =>
   api.get('/parents/my-children').then((r) => r.data);
+
+// Competition approvals
+export const getCompetitionApprovals = (competitionId: string) =>
+  api.get(`/competitions/${competitionId}/approvals`).then((r) => r.data);
+
+export const upsertCompetitionApproval = (competitionId: string, athleteId: string, status: string) =>
+  api.post(`/competitions/${competitionId}/approvals`, { athleteId, status }).then((r) => r.data);
+
+export const respondToApproval = (competitionId: string, athleteId: string, status: 'approved' | 'rejected', comment?: string) =>
+  api.patch(`/competitions/${competitionId}/approvals/${athleteId}/respond`, { status, comment }).then((r) => r.data);
+
+export const getParentApprovals = () =>
+  api.get('/parent/competition-approvals').then((r) => r.data);
+
+// Athletes readiness
+export const getAthletesReadiness = () =>
+  api.get('/athletes/readiness').then((r) => r.data);

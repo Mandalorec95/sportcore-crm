@@ -66,6 +66,26 @@ enum NotificationType {
   training
   competition
   progress
+  competition_approval
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+  allowed_without_consent
+}
+
+enum TaskStatus {
+  new
+  in_progress
+  done
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
 }
 
 enum SessionStatus {
@@ -97,13 +117,15 @@ model Organization {
   city       String?
   createdAt  DateTime @default(now()) @map("created_at")
 
-  users         User[]
-  athletes      Athlete[]
-  groups        TrainingGroup[]
-  competitions  Competition[]
-  notifications Notification[]
-  apiKeys       ApiKey[]
-  payments      Payment[]
+  users               User[]
+  athletes            Athlete[]
+  groups              TrainingGroup[]
+  competitions        Competition[]
+  notifications       Notification[]
+  apiKeys             ApiKey[]
+  payments            Payment[]
+  tasks               Task[]
+  competitionApprovals CompetitionApproval[]
 
   @@map("organizations")
 }
@@ -114,14 +136,18 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   fullName     String   @map("full_name")
+  phone        String?
   role         UserRole
+  demoPassword String?  @map("demo_password")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  org           Organization   @relation(fields: [orgId], references: [id])
-  coach         Coach?
-  parent        Parent?
-  notifications Notification[] @relation("NotificationRecipient")
-  attendances   Attendance[]   @relation("AttendanceCreator")
+  org              Organization          @relation(fields: [orgId], references: [id])
+  coach            Coach?
+  parent           Parent?
+  notifications    Notification[]        @relation("NotificationRecipient")
+  attendances      Attendance[]          @relation("AttendanceCreator")
+  tasks            Task[]                @relation("TaskCreator")
+  coachApprovals   CompetitionApproval[] @relation("ApprovalCoach")
 
   @@map("users")
 }
@@ -138,14 +164,15 @@ model Athlete {
   groupId   String?       @map("group_id")
   createdAt DateTime      @default(now()) @map("created_at")
 
-  org                Organization        @relation(fields: [orgId], references: [id])
-  group              TrainingGroup?      @relation(fields: [groupId], references: [id])
+  org                Organization          @relation(fields: [orgId], references: [id])
+  group              TrainingGroup?        @relation(fields: [groupId], references: [id])
   athleteParents     AthleteParent[]
   attendances        Attendance[]
   payments           Payment[]
   medicalDocuments   MedicalDocument[]
   competitionResults CompetitionResult[]
   progressRecords    ProgressRecord[]
+  competitionApprovals CompetitionApproval[]
 
   @@map("athletes")
 }
@@ -248,6 +275,7 @@ model Attendance {
   sessionId String           @map("session_id")
   athleteId String           @map("athlete_id")
   status    AttendanceStatus
+  grade     Int?
   comment   String?
   createdBy String?          @map("created_by")
   createdAt DateTime         @default(now()) @map("created_at")
@@ -305,8 +333,9 @@ model Competition {
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  org     Organization        @relation(fields: [orgId], references: [id])
-  results CompetitionResult[]
+  org       Organization          @relation(fields: [orgId], references: [id])
+  results   CompetitionResult[]
+  approvals CompetitionApproval[]
 
   @@map("competitions")
 }
@@ -375,4 +404,42 @@ model ApiKey {
   org Organization @relation(fields: [orgId], references: [id])
 
   @@map("api_keys")
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  orgId       String       @map("org_id")
+  createdById String       @map("created_by_id")
+  title       String
+  description String?
+  dueDate     DateTime?    @map("due_date") @db.Date
+  status      TaskStatus   @default(new)
+  priority    TaskPriority @default(medium)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  createdBy User         @relation("TaskCreator", fields: [createdById], references: [id])
+
+  @@map("tasks")
+}
+
+model CompetitionApproval {
+  id            String         @id @default(uuid())
+  orgId         String         @map("org_id")
+  competitionId String         @map("competition_id")
+  athleteId     String         @map("athlete_id")
+  coachId       String         @map("coach_id")
+  status        ApprovalStatus @default(pending)
+  parentComment String?        @map("parent_comment")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  org         Organization @relation(fields: [orgId], references: [id])
+  competition Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  athlete     Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  coach       User         @relation("ApprovalCoach", fields: [coachId], references: [id])
+
+  @@unique([competitionId, athleteId])
+  @@map("competition_approvals")
 }

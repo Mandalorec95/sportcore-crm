@@ -630,11 +630,11 @@ export default function AthletePassportPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Имя</Label>
-                <Input name="firstName" placeholder="Имя" defaultValue={athlete.fullName.split(' ')[1] || ''} />
+                <Input name="firstName" placeholder="Имя" defaultValue={athlete.fullName.split(' ')[0] || ''} />
               </div>
               <div className="space-y-1">
                 <Label>Фамилия</Label>
-                <Input name="lastName" placeholder="Фамилия" defaultValue={athlete.fullName.split(' ')[0] || ''} />
+                <Input name="lastName" placeholder="Фамилия" defaultValue={athlete.fullName.split(' ')[1] || ''} />
               </div>
             </div>
             <div className="space-y-1">

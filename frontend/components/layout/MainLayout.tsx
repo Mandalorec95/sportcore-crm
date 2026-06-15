@@ -24,7 +24,7 @@ export function MainLayout({ children, allowedRoles }: MainLayoutProps) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} onLogout={logout} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto md:pl-0 pt-14 md:pt-0">
         {children}
       </main>
     </div>

@@ -150,7 +150,7 @@ export default function PaymentsPage() {
 
   return (
     <MainLayout allowedRoles={['admin']}>
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-4 md:p-6 max-w-7xl mx-auto">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Оплаты</h1>
@@ -212,13 +212,13 @@ export default function PaymentsPage() {
 
           <TabsContent value="all">
             <Card>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-auto">
                 {paymentsLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
                   </div>
                 ) : (
-                  <Table>
+                  <Table className="min-w-[600px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Спортсмен</TableHead>
@@ -290,13 +290,13 @@ export default function PaymentsPage() {
 
           <TabsContent value="debtors">
             <Card>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-auto">
                 {debtorsLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
                   </div>
                 ) : (
-                  <Table>
+                  <Table className="min-w-[600px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Спортсмен</TableHead>

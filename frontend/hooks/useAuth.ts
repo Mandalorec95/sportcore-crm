@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, getUser, clearAuth } from '@/lib/auth';
 
 export function useAuth() {
@@ -23,17 +23,19 @@ export function useAuth() {
 
 export function useRequireAuth(allowedRoles?: string[]) {
   const { user, loading, logout } = useAuth();
+  const rolesRef = useRef(allowedRoles);
+  rolesRef.current = allowedRoles;
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         window.location.href = '/login';
-      } else if (allowedRoles && !allowedRoles.includes(user.role)) {
+      } else if (rolesRef.current && !rolesRef.current.includes(user.role)) {
         const defaultPage = user.role === 'parent' ? '/parent' : user.role === 'coach' ? '/athletes' : '/dashboard';
         window.location.href = defaultPage;
       }
     }
-  }, [user, loading, allowedRoles]);
+  }, [user, loading]);
 
   return { user, loading, logout };
 }

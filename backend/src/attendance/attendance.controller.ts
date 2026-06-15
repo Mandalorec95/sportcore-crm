@@ -39,4 +39,10 @@ export class AttendanceController {
   getAthleteStats(@Param('athleteId') athleteId: string, @CurrentUser() user: any) {
     return this.attendanceService.getAthleteStats(athleteId, user.orgId);
   }
+
+  @Get('athletes/readiness')
+  @ApiOperation({ summary: 'Готовность всех спортсменов к соревнованиям' })
+  getAllReadiness(@CurrentUser() user: any) {
+    return this.attendanceService.getAllAthletesReadiness(user.orgId);
+  }
 }
