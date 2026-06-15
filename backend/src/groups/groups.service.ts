@@ -74,4 +74,10 @@ export class GroupsService {
       data: { groupId: null },
     });
   }
+
+  async remove(id: string, orgId: string) {
+    await this.findOne(id, orgId);
+    await this.prisma.athlete.updateMany({ where: { groupId: id }, data: { groupId: null } });
+    return this.prisma.trainingGroup.delete({ where: { id } });
+  }
 }

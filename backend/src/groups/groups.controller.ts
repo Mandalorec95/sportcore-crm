@@ -48,4 +48,10 @@ export class GroupsController {
   removeMember(@Param('id') id: string, @Param('athleteId') athleteId: string, @CurrentUser() user: any) {
     return this.groupsService.removeMember(id, athleteId, user.orgId);
   }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Удалить группу' })
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.groupsService.remove(id, user.orgId);
+  }
 }

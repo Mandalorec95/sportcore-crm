@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSessions, getSessionAttendance, bulkMarkAttendance, getGroups, getAthletes } from '@/lib/api';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CalendarCheck, Check, X, Thermometer, Users } from 'lucide-react';
+import { CalendarCheck, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Session {
@@ -30,9 +29,10 @@ interface Session {
 
 interface AttendanceRecord {
   id?: string;
-  athlete?: { id: string; fullName: string };
+  athlete?: { id: string; firstName?: string; lastName?: string; fullName?: string };
   athleteId?: string;
   status?: string;
+  grade?: number | null;
 }
 
 interface AthleteRecord {
@@ -45,7 +45,17 @@ interface Group {
   name: string;
 }
 
-type AttendanceStatus = 'present' | 'absent' | 'sick';
+interface DisplayItem {
+  id: string;
+  fullName: string;
+  status?: string;
+  grade?: number | null;
+}
+
+interface AttendanceEntry {
+  status: 'present' | 'absent' | 'sick';
+  grade: number | null;
+}
 
 export default function AttendancePage() {
   const queryClient = useQueryClient();
@@ -53,7 +63,7 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState('all');
-  const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({});
+  const [entryMap, setEntryMap] = useState<Record<string, AttendanceEntry>>({});
 
   const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ['groups'],
@@ -76,53 +86,60 @@ export default function AttendancePage() {
   });
 
   const currentSession = sessions.find((s) => s.id === selectedSession);
-  const currentGroupId = currentSession?.groupId || currentSession?.group?.id;
+  const currentGroupId = currentSession?.groupId ?? currentSession?.group?.id;
 
-  // When attendance is empty (not yet marked), fetch group athletes
   const { data: groupAthletes = [] } = useQuery<AthleteRecord[]>({
     queryKey: ['athletes', 'group', currentGroupId],
     queryFn: () => getAthletes({ groupId: currentGroupId }),
     enabled: !!selectedSession && !!currentGroupId && attendance.length === 0 && !attendanceLoading,
   });
 
-  // Build the list of people to display
-  // If attendance records exist, use them; otherwise use group athletes
-  const displayList: Array<{ id: string; fullName: string; fromAttendance: boolean; status?: string }> =
+  const getAthleteFullName = (r: AttendanceRecord) => {
+    if (r.athlete?.fullName) return r.athlete.fullName;
+    if (r.athlete?.firstName || r.athlete?.lastName) {
+      return `${r.athlete.firstName ?? ''} ${r.athlete.lastName ?? ''}`.trim();
+    }
+    return '—';
+  };
+
+  const displayList: DisplayItem[] =
     attendance.length > 0
       ? attendance.map((r) => ({
-          id: r.athlete?.id || r.athleteId || '',
-          fullName: r.athlete?.fullName || '—',
-          fromAttendance: true,
+          id: r.athlete?.id ?? r.athleteId ?? '',
+          fullName: getAthleteFullName(r),
           status: r.status,
+          grade: r.grade,
         }))
       : groupAthletes.map((a) => ({
           id: a.id,
-          fullName: a.fullName,
-          fromAttendance: false,
+          fullName: a.fullName ?? '—',
         }));
 
-  // Sync attendance data into local map when it loads
   useEffect(() => {
     if (attendance.length > 0) {
-      const map: Record<string, AttendanceStatus> = {};
+      const map: Record<string, AttendanceEntry> = {};
       attendance.forEach((r) => {
-        const aid = r.athlete?.id || r.athleteId;
-        if (aid && r.status) map[aid] = r.status as AttendanceStatus;
+        const aid = r.athlete?.id ?? r.athleteId;
+        if (aid) {
+          map[aid] = {
+            status: (r.status as AttendanceEntry['status']) ?? 'present',
+            grade: r.grade ?? null,
+          };
+        }
       });
-      setAttendanceMap(map);
+      setEntryMap(map);
     } else {
-      setAttendanceMap({});
+      setEntryMap({});
     }
   }, [attendance]);
 
-  // Reset attendance map when session changes
   useEffect(() => {
-    setAttendanceMap({});
+    setEntryMap({});
   }, [selectedSession]);
 
   const saveMutation = useMutation({
-    mutationFn: (records: Array<{ athleteId: string; status: string }>) =>
-      bulkMarkAttendance(selectedSession!, { records }),
+    mutationFn: (items: Array<{ athleteId: string; status: string; grade?: number | null }>) =>
+      bulkMarkAttendance(selectedSession!, { items }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Посещаемость сохранена');
@@ -130,51 +147,72 @@ export default function AttendancePage() {
     onError: () => toast.error('Ошибка при сохранении'),
   });
 
-  const handleMarkAll = (status: AttendanceStatus) => {
-    const newMap: Record<string, AttendanceStatus> = {};
+  const handleMarkAllPresent = () => {
+    const newMap: Record<string, AttendanceEntry> = {};
     displayList.forEach((item) => {
-      if (item.id) newMap[item.id] = status;
+      if (item.id) newMap[item.id] = { status: 'present', grade: null };
     });
-    setAttendanceMap(newMap);
+    setEntryMap(newMap);
   };
 
   const handleSave = () => {
-    const records = Object.entries(attendanceMap).map(([athleteId, status]) => ({
+    const items = Object.entries(entryMap).map(([athleteId, entry]) => ({
       athleteId,
-      status,
+      status: entry.status,
+      grade: entry.grade ?? undefined,
     }));
-    if (records.length === 0) {
-      toast.error('Отметьте статус хотя бы одного спортсмена');
+    if (items.length === 0) {
+      toast.error('Отметьте хотя бы одного спортсмена');
       return;
     }
-    saveMutation.mutate(records);
+    saveMutation.mutate(items);
   };
 
-  const setStatus = (athleteId: string, status: AttendanceStatus) => {
-    setAttendanceMap((prev) => ({ ...prev, [athleteId]: status }));
+  const setStatus = (athleteId: string, status: 'present' | 'absent' | 'sick') => {
+    setEntryMap((prev) => ({
+      ...prev,
+      [athleteId]: { ...(prev[athleteId] ?? { grade: null }), status },
+    }));
+  };
+
+  const setGrade = (athleteId: string, grade: number | null) => {
+    setEntryMap((prev) => ({
+      ...prev,
+      [athleteId]: { ...(prev[athleteId] ?? { status: 'present' }), grade, status: 'present' },
+    }));
   };
 
   const getSessionTime = (session: Session) => {
     if (session.startTime) return session.startTime;
-    const dateStr = session.sessionDate || session.date;
+    const dateStr = session.sessionDate ?? session.date;
     if (dateStr) {
-      return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      try {
+        return new Date(dateStr).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      } catch {
+        return '';
+      }
     }
     return '';
   };
 
   const getSessionDateDisplay = (session: Session) => {
-    const dateStr = session.sessionDate || session.date;
-    if (dateStr) return new Date(dateStr).toLocaleDateString('ru-RU');
+    const dateStr = session.sessionDate ?? session.date;
+    if (dateStr) {
+      try {
+        return new Date(dateStr).toLocaleDateString('ru-RU');
+      } catch {
+        return dateStr;
+      }
+    }
     return '';
   };
 
   return (
     <MainLayout allowedRoles={['admin', 'coach']}>
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 md:p-6 max-w-6xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Посещаемость</h1>
-          <p className="text-gray-500 mt-1">Отметьте присутствие спортсменов</p>
+          <p className="text-gray-500 mt-1">Журнал посещаемости и оценок</p>
         </div>
 
         {/* Filters */}
@@ -195,7 +233,11 @@ export default function AttendancePage() {
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Группа</label>
-                <Select value={selectedGroup} onValueChange={(v) => { setSelectedGroup(v ?? 'all'); setSelectedSession(null); }}>
+                <Select
+                  modal={false}
+                  value={selectedGroup}
+                  onValueChange={(v) => { setSelectedGroup(v ?? 'all'); setSelectedSession(null); }}
+                >
                   <SelectTrigger className="w-44">
                     <SelectValue placeholder="Все группы" />
                   </SelectTrigger>
@@ -237,7 +279,7 @@ export default function AttendancePage() {
                   onClick={() => setSelectedSession(session.id)}
                 >
                   <CardContent className="p-4">
-                    <div className="font-medium text-sm">{session.group?.name || 'Группа'}</div>
+                    <div className="font-medium text-sm">{session.group?.name ?? 'Группа'}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {getSessionTime(session)}
                       {session.startTime && session.endTime && ` – ${session.endTime}`}
@@ -251,7 +293,7 @@ export default function AttendancePage() {
             )}
           </div>
 
-          {/* Attendance list */}
+          {/* Attendance journal */}
           <div className="lg:col-span-2">
             {!selectedSession ? (
               <Card>
@@ -274,17 +316,13 @@ export default function AttendancePage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleMarkAll('present')}
+                        onClick={handleMarkAllPresent}
                         className="text-green-600 border-green-200 hover:bg-green-50"
                       >
                         <Users className="h-4 w-4 mr-1" />
                         Все присутствуют
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={saveMutation.isPending}
-                      >
+                      <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending}>
                         {saveMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                       </Button>
                     </div>
@@ -300,62 +338,90 @@ export default function AttendancePage() {
                       Нет спортсменов в этой группе
                     </div>
                   ) : (
-                    <div className="divide-y">
-                      {displayList.map((item) => {
-                        const currentStatus = attendanceMap[item.id] || item.status;
+                    <>
+                      {/* Header row */}
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 border-b">
+                        <span>Спортсмен</span>
+                        <span className="w-28 text-center">Оценка (1–5)</span>
+                        <span className="w-24 text-center">Статус</span>
+                      </div>
+                      <div className="divide-y overflow-x-auto">
+                        {displayList.map((item) => {
+                          const entry = entryMap[item.id];
+                          const currentStatus = entry?.status ?? (item.status as AttendanceEntry['status']) ?? undefined;
+                          const currentGrade = entry?.grade ?? item.grade ?? null;
 
-                        return (
-                          <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-600">
-                                {item.fullName.charAt(0)}
+                          return (
+                            <div key={item.id} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center px-4 py-3 min-w-[380px]">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-600">
+                                  {(item.fullName ?? '?').charAt(0)}
+                                </div>
+                                <span className="font-medium text-sm truncate">{item.fullName}</span>
                               </div>
-                              <span className="font-medium text-sm">{item.fullName}</span>
+
+                              {/* Grade selector */}
+                              <div className="flex items-center gap-1 w-28 justify-center">
+                                {currentStatus === 'absent' ? (
+                                  <span className="text-xs text-red-400">не был</span>
+                                ) : (
+                                  [1, 2, 3, 4, 5].map((g) => (
+                                    <button
+                                      key={g}
+                                      onClick={() => setGrade(item.id, currentGrade === g ? null : g)}
+                                      className={`w-6 h-6 rounded text-xs font-bold transition-colors ${
+                                        currentGrade === g
+                                          ? g >= 4 ? 'bg-green-500 text-white' : g === 3 ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'
+                                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                      }`}
+                                    >
+                                      {g}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+
+                              {/* Status: present / absent / sick */}
+                              <div className="flex items-center gap-1 w-24 justify-center">
+                                <button
+                                  onClick={() => setStatus(item.id, 'present')}
+                                  title="Присутствует"
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                    currentStatus === 'present' || (!currentStatus && currentGrade != null)
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-gray-100 text-gray-400 hover:bg-green-50'
+                                  }`}
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => setStatus(item.id, 'absent')}
+                                  title="Отсутствует"
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                    currentStatus === 'absent'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-gray-100 text-gray-400 hover:bg-red-50'
+                                  }`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => setStatus(item.id, 'sick')}
+                                  title="Болеет"
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                    currentStatus === 'sick'
+                                      ? 'bg-orange-100 text-orange-700'
+                                      : 'bg-gray-100 text-gray-400 hover:bg-orange-50'
+                                  }`}
+                                >
+                                  🤒
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              {currentStatus && (
-                                <span className="mr-2 text-xs text-gray-400">
-                                  <StatusBadge status={currentStatus} />
-                                </span>
-                              )}
-                              <button
-                                onClick={() => item.id && setStatus(item.id, 'present')}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  currentStatus === 'present'
-                                    ? 'bg-green-100 text-green-600'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-500'
-                                }`}
-                                title="Присутствует"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => item.id && setStatus(item.id, 'absent')}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  currentStatus === 'absent'
-                                    ? 'bg-red-100 text-red-600'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
-                                }`}
-                                title="Отсутствует"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => item.id && setStatus(item.id, 'sick')}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  currentStatus === 'sick'
-                                    ? 'bg-orange-100 text-orange-600'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500'
-                                }`}
-                                title="Болеет"
-                              >
-                                <Thermometer className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>

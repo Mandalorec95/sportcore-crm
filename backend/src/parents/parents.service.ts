@@ -67,6 +67,8 @@ export class ParentsService {
       const a = ap.athlete;
       const attended = a.attendances.filter((x) => x.status === 'present' || x.status === 'late').length;
       const rate = a.attendances.length > 0 ? Math.round((attended / a.attendances.length) * 100) : 0;
+      const grades = a.attendances.filter((x) => x.grade != null).map((x) => x.grade as number);
+      const avgGrade = grades.length > 0 ? Math.round((grades.reduce((s, g) => s + g, 0) / grades.length) * 10) / 10 : null;
 
       return {
         id: a.id,
@@ -82,10 +84,16 @@ export class ParentsService {
             }
           : null,
         attendanceRate: rate,
+        avgGrade,
         payments: a.payments,
         medicalDocuments: a.medicalDocuments,
         recentProgress: a.progressRecords,
         recentCompetitions: a.competitionResults,
+        recentAttendance: a.attendances.map((x) => ({
+          date: x.createdAt,
+          status: x.status,
+          grade: x.grade,
+        })),
       };
     });
   }

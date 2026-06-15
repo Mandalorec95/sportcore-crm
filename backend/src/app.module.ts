@@ -16,6 +16,8 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
 import { PublicApiModule } from './public-api/public-api.module';
 import { CoachesModule } from './coaches/coaches.module';
 import { ParentsModule } from './parents/parents.module';
+import { TasksModule } from './tasks/tasks.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   controllers: [AppController],
@@ -36,6 +38,8 @@ import { ParentsModule } from './parents/parents.module';
     PublicApiModule,
     CoachesModule,
     ParentsModule,
+    TasksModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

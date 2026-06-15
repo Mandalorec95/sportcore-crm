@@ -37,8 +37,9 @@ import { toast } from 'sonner';
 interface Athlete {
   id: string;
   fullName: string;
-  dateOfBirth: string;
-  sport?: string;
+  birthDate?: string;
+  dateOfBirth?: string;
+  sportType?: string;
   group?: { id: string; name: string };
   paymentStatus?: string;
   medicalStatus?: string;
@@ -112,20 +113,22 @@ export default function AthletesPage() {
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const parentName = fd.get('parentName') as string;
+    const parentPhone = fd.get('parentPhone') as string;
+    const parentEmail = fd.get('parentEmail') as string;
     createMutation.mutate({
-      fullName: fd.get('fullName') as string,
-      dateOfBirth: fd.get('dateOfBirth') as string,
-      sport: fd.get('sport') as string,
+      firstName: fd.get('firstName') as string,
+      lastName: fd.get('lastName') as string,
+      birthDate: fd.get('birthDate') as string,
+      sportType: (fd.get('sportType') as string) || undefined,
       groupId: formGroupId || undefined,
-      coachId: formCoachId || undefined,
-      parentPhone: fd.get('parentPhone') as string,
-      parentName: fd.get('parentName') as string,
+      parent: parentName ? { fullName: parentName, phone: parentPhone || undefined, email: parentEmail || undefined } : undefined,
     });
   };
 
   return (
     <MainLayout allowedRoles={['admin', 'coach']}>
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-4 md:p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -154,7 +157,7 @@ export default function AthletesPage() {
                 </div>
               </div>
               <div className="min-w-40">
-                <Select value={selectedGroup} onValueChange={(v) => setSelectedGroup(v ?? 'all')}>
+                <Select modal={false} value={selectedGroup} onValueChange={(v) => setSelectedGroup(v ?? 'all')}>
                   <SelectTrigger>
                     <SelectValue placeholder="Группа" />
                   </SelectTrigger>
@@ -169,7 +172,7 @@ export default function AthletesPage() {
                 </Select>
               </div>
               <div className="min-w-40">
-                <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v ?? 'all')}>
+                <Select modal={false} value={selectedStatus} onValueChange={(v) => setSelectedStatus(v ?? 'all')}>
                   <SelectTrigger>
                     <SelectValue placeholder="Статус оплаты" />
                   </SelectTrigger>
@@ -187,13 +190,13 @@ export default function AthletesPage() {
 
         {/* Table */}
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             {isLoading ? (
               <div className="flex items-center justify-center h-48">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>ФИО</TableHead>
@@ -221,7 +224,9 @@ export default function AthletesPage() {
                       >
                         <TableCell className="font-medium">{athlete.fullName}</TableCell>
                         <TableCell>
-                          {athlete.dateOfBirth ? calculateAge(athlete.dateOfBirth) + ' лет' : '—'}
+                          {(athlete.birthDate || athlete.dateOfBirth)
+                            ? calculateAge((athlete.birthDate || athlete.dateOfBirth)!) + ' лет'
+                            : '—'}
                         </TableCell>
                         <TableCell>{athlete.group?.name || '—'}</TableCell>
                         <TableCell>
@@ -263,21 +268,25 @@ export default function AthletesPage() {
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="firstName">Имя *</Label>
+                  <Input id="firstName" name="firstName" required placeholder="Иван" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="lastName">Фамилия *</Label>
+                  <Input id="lastName" name="lastName" required placeholder="Иванов" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="birthDate">Дата рождения *</Label>
+                  <Input id="birthDate" name="birthDate" type="date" required />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="sportType">Вид спорта</Label>
+                  <Input id="sportType" name="sportType" placeholder="Футбол" />
+                </div>
                 <div className="col-span-2 space-y-1">
-                  <Label htmlFor="fullName">ФИО *</Label>
-                  <Input id="fullName" name="fullName" required placeholder="Иванов Иван Иванович" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="dateOfBirth">Дата рождения *</Label>
-                  <Input id="dateOfBirth" name="dateOfBirth" type="date" required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="sport">Вид спорта</Label>
-                  <Input id="sport" name="sport" placeholder="Футбол" />
-                </div>
-                <div className="space-y-1">
                   <Label>Группа</Label>
-                  <Select value={formGroupId} onValueChange={(v) => setFormGroupId(v ?? '')}>
+                  <Select modal={false} value={formGroupId} onValueChange={(v) => setFormGroupId(v ?? '')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Выберите группу" />
                     </SelectTrigger>
@@ -289,27 +298,16 @@ export default function AthletesPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Тренер</Label>
-                  <Select value={formCoachId} onValueChange={(v) => setFormCoachId(v ?? '')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите тренера" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {coaches.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.fullName || c.user?.fullName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="parentName">Имя родителя</Label>
+                  <Label htmlFor="parentName">ФИО родителя</Label>
                   <Input id="parentName" name="parentName" placeholder="Иванова Мария" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="parentPhone">Телефон родителя</Label>
                   <Input id="parentPhone" name="parentPhone" placeholder="+7 999 000 00 00" />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  <Label htmlFor="parentEmail">Email родителя</Label>
+                  <Input id="parentEmail" name="parentEmail" type="email" placeholder="parent@example.com" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">

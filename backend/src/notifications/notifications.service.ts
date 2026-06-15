@@ -21,7 +21,7 @@ export class NotificationsService {
   }
 
   async create(orgId: string, recipientId: string, type: string, title: string, message: string) {
-    const validTypes = ['payment_debt', 'doc_expiring', 'training', 'competition', 'progress'];
+    const validTypes = ['payment_debt', 'doc_expiring', 'training', 'competition', 'progress', 'competition_approval'];
     const safeType = validTypes.includes(type) ? type : 'training';
     return this.prisma.notification.create({
       data: { orgId, recipientId, type: safeType as any, title, message },

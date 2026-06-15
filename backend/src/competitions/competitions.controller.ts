@@ -53,4 +53,33 @@ export class CompetitionsController {
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.competitionsService.remove(id, user.orgId);
   }
+
+  @Get('competitions/:id/approvals')
+  @ApiOperation({ summary: 'Запросы допуска к соревнованию' })
+  getApprovals(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.competitionsService.getApprovals(id, user.orgId);
+  }
+
+  @Post('competitions/:id/approvals')
+  @ApiOperation({ summary: 'Создать/обновить запрос допуска' })
+  upsertApproval(@Param('id') id: string, @Body() body: { athleteId: string; status: string }, @CurrentUser() user: any) {
+    return this.competitionsService.upsertApproval(id, body.athleteId, user.id, user.orgId, body.status);
+  }
+
+  @Patch('competitions/:id/approvals/:athleteId/respond')
+  @ApiOperation({ summary: 'Родитель отвечает на запрос допуска' })
+  parentRespond(
+    @Param('id') id: string,
+    @Param('athleteId') athleteId: string,
+    @Body() body: { status: 'approved' | 'rejected'; comment?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.competitionsService.parentRespond(id, athleteId, user.id, body.status, body.comment);
+  }
+
+  @Get('parent/competition-approvals')
+  @ApiOperation({ summary: 'Запросы допуска для родителя' })
+  getParentApprovals(@CurrentUser() user: any) {
+    return this.competitionsService.getParentApprovals(user.id, user.orgId);
+  }
 }
