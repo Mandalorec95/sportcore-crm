@@ -270,7 +270,7 @@ export default function UsersPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1">
                 <Label htmlFor="fullName">ФИО *</Label>
-                <Input id="fullName" name="fullName" required placeholder="Иванов Иван" />
+                <Input id="fullName" name="fullName" required placeholder="Дудаев Мовлади" />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="email">Email (логин) *</Label>

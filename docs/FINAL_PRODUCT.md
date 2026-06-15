@@ -288,7 +288,7 @@ SportPass CRM — единая система для спортивных сек
 4. Внешний сервис делает запрос:
    ```
    GET /api/v1/athletes/{id}/sport-passport
-   X-API-Key: sk_live_...
+   X-API-Key: sp_live_...
    ```
 5. Получает JSON с данными цифрового паспорта спортсмена.
 6. Отображает данные на сайте клуба или в боте.
@@ -518,7 +518,7 @@ created_at    TIMESTAMP DEFAULT NOW()
 Swagger: `http://localhost:4000/docs`
 
 Авторизация для внутреннего API: `Authorization: Bearer <jwt_token>`
-Авторизация для публичного API: `X-API-Key: sk_live_...`
+Авторизация для публичного API: `X-API-Key: sp_live_...`
 
 ---
 
@@ -539,7 +539,7 @@ Swagger: `http://localhost:4000/docs`
 {
   "access_token": "eyJ...",
   "refresh_token": "eyJ...",
-  "user": { "id": "uuid", "role": "admin", "full_name": "Иванов Пётр" }
+  "user": { "id": "uuid", "role": "admin", "full_name": "Дудаев Мовлади" }
 }
 ```
 
@@ -741,7 +741,7 @@ Swagger: `http://localhost:4000/docs`
 
 ### Публичный API (для внешних сервисов)
 
-Авторизация: `X-API-Key: sk_live_...`
+Авторизация: `X-API-Key: sp_live_...`
 
 | Метод | URL | Назначение |
 |---|---|---|

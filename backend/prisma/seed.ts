@@ -28,13 +28,13 @@ async function main() {
   // Admin user
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@sportcrm.ru' },
-    update: {},
+    update: { fullName: 'Дудаев Мовлади Сайд-Эмиевич' },
     create: {
       id: 'user-admin-001',
       orgId: org.id,
       email: 'admin@sportcrm.ru',
       passwordHash: await hash('demo123'),
-      fullName: 'Иванов Пётр Алексеевич',
+      fullName: 'Дудаев Мовлади Сайд-Эмиевич',
       role: 'admin',
     },
   });
@@ -278,7 +278,7 @@ async function main() {
 
   // Demo API key
   const { randomBytes } = await import('crypto');
-  const demoKey = `sk_live_demo_${randomBytes(12).toString('hex')}`;
+  const demoKey = `sp_live_demo_${randomBytes(12).toString('hex')}`;
   const keyHash = await hash(demoKey);
   await prisma.apiKey.create({
     data: {

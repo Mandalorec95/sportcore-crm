@@ -270,11 +270,11 @@ export default function AthletesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="firstName">Имя *</Label>
-                  <Input id="firstName" name="firstName" required placeholder="Иван" />
+                  <Input id="firstName" name="firstName" required placeholder="Адам" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="lastName">Фамилия *</Label>
-                  <Input id="lastName" name="lastName" required placeholder="Иванов" />
+                  <Input id="lastName" name="lastName" required placeholder="Мусаев" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="birthDate">Дата рождения *</Label>
@@ -299,7 +299,7 @@ export default function AthletesPage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="parentName">ФИО родителя</Label>
-                  <Input id="parentName" name="parentName" placeholder="Иванова Мария" />
+                  <Input id="parentName" name="parentName" placeholder="Мусаева Амина" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="parentPhone">Телефон родителя</Label>

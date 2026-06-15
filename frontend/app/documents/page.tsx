@@ -31,7 +31,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileWarning, Plus, Trash2, Edit } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { FileWarning, Plus, Trash2, Edit, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MedDocument {
@@ -50,11 +51,19 @@ interface Athlete {
 }
 
 const DOC_TYPES = [
-  { value: 'medical_certificate', label: 'Медицинская справка' },
+  { value: 'medical_cert', label: 'Медицинская справка' },
   { value: 'insurance', label: 'Страховка' },
-  { value: 'consent', label: 'Согласие родителей' },
-  { value: 'passport_copy', label: 'Копия паспорта' },
+  { value: 'parental_consent', label: 'Согласие родителей' },
 ];
+
+const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  valid: 'действует действительно',
+  expires_soon: 'истекает скоро требует внимания',
+  expired: 'истекло просрочено',
+};
+
+const normalizeSearch = (value?: string | number | null) =>
+  String(value ?? '').toLowerCase().trim();
 
 function getAthleteFullName(doc: MedDocument): string {
   if (doc.athlete?.fullName) return doc.athlete.fullName;
@@ -64,11 +73,21 @@ function getAthleteFullName(doc: MedDocument): string {
   return '—';
 }
 
+function getDocTypeLabel(docType?: string) {
+  const legacyLabels: Record<string, string> = {
+    medical_certificate: 'Медицинская справка',
+    consent: 'Согласие родителей',
+    passport_copy: 'Копия паспорта',
+  };
+  return DOC_TYPES.find((type) => type.value === docType)?.label ?? (docType ? legacyLabels[docType] ?? docType : '—');
+}
+
 export default function DocumentsPage() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [editDoc, setEditDoc] = useState<MedDocument | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: allDocs = [], isLoading: allLoading } = useQuery<MedDocument[]>({
     queryKey: ['medical-documents'],
@@ -84,6 +103,8 @@ export default function DocumentsPage() {
     queryKey: ['athletes'],
     queryFn: () => getAthletes(),
   });
+
+  const normalizedSearch = normalizeSearch(search);
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => createMedicalDocument(data),
@@ -154,6 +175,26 @@ export default function DocumentsPage() {
     return '';
   };
 
+  const filterDocuments = (docs: MedDocument[]) => docs.filter((doc) => {
+    if (!normalizedSearch) return true;
+    const daysLeft = doc.validUntil ? getDaysLeft(doc.validUntil) : (doc.daysLeft ?? null);
+    const searchable = [
+      getAthleteFullName(doc),
+      doc.athlete?.group?.name,
+      getDocTypeLabel(doc.docType),
+      doc.docType,
+      doc.issuedAt,
+      doc.validUntil,
+      daysLeft,
+      doc.status,
+      doc.status ? DOCUMENT_STATUS_LABELS[doc.status] : '',
+    ].join(' ');
+    return normalizeSearch(searchable).includes(normalizedSearch);
+  });
+
+  const filteredAllDocs = filterDocuments(allDocs);
+  const filteredExpiringDocs = filterDocuments(expiringDocs);
+
   const DocTable = ({ docs, isLoading }: { docs: MedDocument[]; isLoading: boolean }) => (
     <Card>
       <CardContent className="p-0">
@@ -162,9 +203,9 @@ export default function DocumentsPage() {
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
           </div>
         ) : docs.length === 0 ? (
-          <div className="text-center text-green-600 py-12">
+          <div className={`text-center py-12 ${normalizedSearch ? 'text-gray-500' : 'text-green-600'}`}>
             <FileWarning className="h-12 w-12 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">Нет документов</p>
+            <p className="font-medium">{normalizedSearch ? 'Ничего не найдено' : 'Нет документов'}</p>
           </div>
         ) : (
           <Table>
@@ -188,11 +229,9 @@ export default function DocumentsPage() {
                   <TableRow key={doc.id} className={rowClass}>
                     <TableCell className="font-medium">{getAthleteFullName(doc)}</TableCell>
                     <TableCell>{doc.athlete?.group?.name || '—'}</TableCell>
-                    <TableCell>{doc.docType || '—'}</TableCell>
-                    <TableCell>{doc.issuedAt ? new Date(doc.issuedAt).toLocaleDateString('ru-RU') : '—'}</TableCell>
-                    <TableCell>
-                      {doc.validUntil ? new Date(doc.validUntil).toLocaleDateString('ru-RU') : '—'}
-                    </TableCell>
+                    <TableCell>{getDocTypeLabel(doc.docType)}</TableCell>
+                    <TableCell>{formatDate(doc.issuedAt)}</TableCell>
+                    <TableCell>{formatDate(doc.validUntil)}</TableCell>
                     <TableCell>
                       {daysLeft != null ? (
                         <span className={daysLeft < 0 ? 'text-red-700 font-bold' : daysLeft < 14 ? 'text-yellow-700 font-semibold' : 'text-green-700'}>
@@ -254,19 +293,30 @@ export default function DocumentsPage() {
         </div>
 
         <Tabs defaultValue="all">
-          <TabsList className="mb-4">
-            <TabsTrigger value="all">Все документы ({allDocs.length})</TabsTrigger>
-            <TabsTrigger value="expiring" className="text-yellow-600">
-              Требуют внимания ({expiringDocs.length})
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <TabsList>
+              <TabsTrigger value="all">Все документы ({allDocs.length})</TabsTrigger>
+              <TabsTrigger value="expiring" className="text-yellow-600">
+                Требуют внимания ({expiringDocs.length})
+              </TabsTrigger>
+            </TabsList>
+            <div className="relative w-full md:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по спортсмену, группе, документу..."
+                className="pl-9"
+              />
+            </div>
+          </div>
 
           <TabsContent value="all">
-            <DocTable docs={allDocs} isLoading={allLoading} />
+            <DocTable docs={filteredAllDocs} isLoading={allLoading} />
           </TabsContent>
 
           <TabsContent value="expiring">
-            <DocTable docs={expiringDocs} isLoading={expiringLoading} />
+            <DocTable docs={filteredExpiringDocs} isLoading={expiringLoading} />
           </TabsContent>
         </Tabs>
 

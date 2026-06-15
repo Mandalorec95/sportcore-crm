@@ -1,9 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { MedicalDocumentsService } from './medical-documents.service';
-import { CreateMedicalDocDto } from './dto/create-medical-doc.dto';
+import { CreateMedicalDocDto, CreateMedicalDocWithAthleteDto } from './dto/create-medical-doc.dto';
+import { UpdateMedicalDocDto } from './dto/update-medical-doc.dto';
 
 @ApiTags('medical-documents')
 @ApiBearerAuth()
@@ -26,6 +27,7 @@ export class MedicalDocumentsController {
 
   @Get('medical-documents/expiring')
   @ApiOperation({ summary: 'Истекающие документы' })
+  @ApiQuery({ name: 'days', required: false, example: 14, description: 'How many days ahead to check.' })
   expiring(@CurrentUser() user: any, @Query('days') days?: string) {
     return this.medDocService.getExpiring(user.orgId, days ? parseInt(days) : 14);
   }
@@ -38,13 +40,13 @@ export class MedicalDocumentsController {
 
   @Post('medical-documents')
   @ApiOperation({ summary: 'Создать документ' })
-  createDoc(@Body() body: { athleteId: string; docType: string; issuedAt?: string; validUntil: string; fileUrl?: string }) {
+  createDoc(@Body() body: CreateMedicalDocWithAthleteDto) {
     return this.medDocService.create(body.athleteId, body as any);
   }
 
   @Patch('medical-documents/:id')
   @ApiOperation({ summary: 'Обновить документ' })
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateMedicalDocDto) {
     return this.medDocService.update(id, body);
   }
 

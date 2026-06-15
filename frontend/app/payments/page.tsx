@@ -24,7 +24,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CreditCard, AlertCircle, Phone, Plus, Trash2 } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { CreditCard, AlertCircle, Phone, Plus, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Payment {
@@ -60,12 +61,23 @@ interface Athlete {
   fullName: string;
 }
 
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  paid: 'оплачено',
+  partial: 'частично',
+  debt: 'долг задолженность',
+  pending: 'ожидает ожидание',
+};
+
+const normalizeSearch = (value?: string | number | null) =>
+  String(value ?? '').toLowerCase().trim();
+
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
   const [confirmModal, setConfirmModal] = useState<{ paymentId: string; amount?: number } | null>(null);
   const [paidAmount, setPaidAmount] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery<Payment[]>({
     queryKey: ['payments'],
@@ -84,6 +96,7 @@ export default function PaymentsPage() {
 
   const debtors = debtorsData?.debtors ?? [];
   const totalDebt = debtorsData?.totalDebt ?? 0;
+  const normalizedSearch = normalizeSearch(search);
 
   const confirmMutation = useMutation({
     mutationFn: ({ id, amount }: { id: string; amount: number }) =>
@@ -148,6 +161,36 @@ export default function PaymentsPage() {
     return '—';
   };
 
+  const filteredPayments = payments.filter((p) => {
+    if (!normalizedSearch) return true;
+    const searchable = [
+      getFullName(p),
+      p.athlete?.group?.name,
+      p.periodMonth,
+      p.amount,
+      p.paidAmount,
+      p.dueDate,
+      p.status,
+      p.status ? PAYMENT_STATUS_LABELS[p.status] : '',
+    ].join(' ');
+    return normalizeSearch(searchable).includes(normalizedSearch);
+  });
+
+  const filteredDebtors = debtors.filter((d) => {
+    if (!normalizedSearch) return true;
+    const searchable = [
+      d.fullName,
+      d.group,
+      d.parentPhone,
+      d.debtAmount,
+      d.periodMonth,
+      d.dueDate,
+      d.overdueDays,
+      'долг должник задолженность',
+    ].join(' ');
+    return normalizeSearch(searchable).includes(normalizedSearch);
+  });
+
   return (
     <MainLayout allowedRoles={['admin']}>
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
@@ -202,13 +245,24 @@ export default function PaymentsPage() {
         </div>
 
         <Tabs defaultValue="all">
-          <TabsList className="mb-4">
-            <TabsTrigger value="all">Все платежи</TabsTrigger>
-            <TabsTrigger value="debtors" className="text-red-600">
-              Должники ({debtors.length})
-              {totalDebt > 0 && <span className="ml-1 text-xs">· {totalDebt.toLocaleString('ru-RU')} ₽</span>}
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <TabsList>
+              <TabsTrigger value="all">Все платежи</TabsTrigger>
+              <TabsTrigger value="debtors" className="text-red-600">
+                Должники ({debtors.length})
+                {totalDebt > 0 && <span className="ml-1 text-xs">· {totalDebt.toLocaleString('ru-RU')} ₽</span>}
+              </TabsTrigger>
+            </TabsList>
+            <div className="relative w-full md:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по спортсмену, группе, периоду..."
+                className="pl-9"
+              />
+            </div>
+          </div>
 
           <TabsContent value="all">
             <Card>
@@ -232,14 +286,14 @@ export default function PaymentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payments.length === 0 ? (
+                      {filteredPayments.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center text-gray-500 py-8">
-                            Нет данных
+                            {normalizedSearch ? 'Ничего не найдено' : 'Нет данных'}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        payments.map((p) => (
+                        filteredPayments.map((p) => (
                           <TableRow key={p.id} className={p.status === 'debt' ? 'bg-red-50' : ''}>
                             <TableCell className="font-medium">
                               {getFullName(p)}
@@ -248,9 +302,7 @@ export default function PaymentsPage() {
                             <TableCell>{p.periodMonth || '—'}</TableCell>
                             <TableCell>{p.amount?.toLocaleString('ru-RU')} ₽</TableCell>
                             <TableCell>{(p.paidAmount ?? 0).toLocaleString('ru-RU')} ₽</TableCell>
-                            <TableCell>
-                              {p.dueDate ? new Date(p.dueDate).toLocaleDateString('ru-RU') : '—'}
-                            </TableCell>
+                            <TableCell>{formatDate(p.dueDate)}</TableCell>
                             <TableCell>
                               {p.status ? <StatusBadge status={p.status} /> : '—'}
                             </TableCell>
@@ -309,14 +361,14 @@ export default function PaymentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {debtors.length === 0 ? (
+                      {filteredDebtors.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-green-600 py-8">
-                            Должников нет!
+                          <TableCell colSpan={7} className={`text-center py-8 ${normalizedSearch ? 'text-gray-500' : 'text-green-600'}`}>
+                            {normalizedSearch ? 'Ничего не найдено' : 'Должников нет!'}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        debtors.map((d) => (
+                        filteredDebtors.map((d) => (
                           <TableRow key={d.paymentId} className="bg-red-50">
                             <TableCell className="font-medium">{d.fullName}</TableCell>
                             <TableCell>{typeof d.group === 'string' ? d.group : '—'}</TableCell>
