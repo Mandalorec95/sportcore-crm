@@ -11,6 +11,10 @@ CRM-система для детских спортивных секций с ц
 ### Вариант 1 — Автоматическая установка (рекомендуется)
 
 ```bash
+apt update && apt upgrade -y
+apt install -y git curl ca-certificates
+curl -fsSL https://get.docker.com | sh
+systemctl enable --now docker
 git clone https://github.com/Mandalorec95/sportcore-crm.git
 cd sportcore-crm
 cp .env.example backend/.env        # при необходимости отредактируйте
