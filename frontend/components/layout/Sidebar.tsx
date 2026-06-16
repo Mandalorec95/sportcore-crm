@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -36,7 +35,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
+  { href: '/dashboard', label: 'Панель управления', icon: LayoutDashboard, roles: ['admin'] },
   { href: '/athletes', label: 'Спортсмены', icon: Users, roles: ['admin', 'coach'] },
   { href: '/groups', label: 'Группы', icon: UsersRound, roles: ['admin', 'coach'] },
   { href: '/attendance', label: 'Посещаемость', icon: CalendarCheck, roles: ['admin', 'coach'] },
@@ -97,7 +96,7 @@ function SidebarContent({ user, onLogout, pathname, onCloseMobile }: SidebarCont
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
-            <Link
+            <a
               key={item.href}
               href={item.href}
               onClick={onCloseMobile}
@@ -110,7 +109,7 @@ function SidebarContent({ user, onLogout, pathname, onCloseMobile }: SidebarCont
             >
               <Icon className="h-5 w-5 flex-shrink-0" />
               {item.label}
-            </Link>
+            </a>
           );
         })}
       </nav>

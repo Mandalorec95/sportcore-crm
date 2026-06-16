@@ -14,8 +14,8 @@ export class ProgressController {
 
   @Get()
   @ApiOperation({ summary: 'Прогресс спортсмена' })
-  findByAthlete(@Param('athleteId') athleteId: string) {
-    return this.progressService.findByAthlete(athleteId);
+  findByAthlete(@Param('athleteId') athleteId: string, @CurrentUser() user: any) {
+    return this.progressService.findByAthlete(athleteId, user.orgId);
   }
 
   @Post()

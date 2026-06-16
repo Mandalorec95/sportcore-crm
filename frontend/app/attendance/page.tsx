@@ -2,10 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSessions, getSessionAttendance, bulkMarkAttendance, getGroups, getAthletes } from '@/lib/api';
+import {
+  getSessions,
+  createSession,
+  getSessionAttendance,
+  bulkMarkAttendance,
+  getGroups,
+  getCoaches,
+  getAthletes,
+} from '@/lib/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -13,8 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CalendarCheck, Users, X } from 'lucide-react';
+import { CalendarCheck, Plus, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate } from '@/lib/utils';
 
 interface Session {
   id: string;
@@ -25,6 +42,7 @@ interface Session {
   groupId?: string;
   group?: { id: string; name: string };
   topic?: string;
+  location?: string;
 }
 
 interface AttendanceRecord {
@@ -43,6 +61,14 @@ interface AthleteRecord {
 interface Group {
   id: string;
   name: string;
+  coachId?: string | null;
+  coach?: { id?: string; fullName?: string; user?: { fullName?: string } } | null;
+}
+
+interface Coach {
+  id: string;
+  fullName?: string;
+  user?: { fullName?: string };
 }
 
 interface DisplayItem {
@@ -64,10 +90,24 @@ export default function AttendancePage() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [entryMap, setEntryMap] = useState<Record<string, AttendanceEntry>>({});
+  const [showCreateSession, setShowCreateSession] = useState(false);
+  const [sessionForm, setSessionForm] = useState({
+    groupId: '',
+    coachId: 'none',
+    startTime: '17:00',
+    endTime: '18:30',
+    location: '',
+    topic: '',
+  });
 
   const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ['groups'],
     queryFn: getGroups,
+  });
+
+  const { data: coaches = [] } = useQuery<Coach[]>({
+    queryKey: ['coaches'],
+    queryFn: getCoaches,
   });
 
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery<Session[]>({
@@ -137,6 +177,17 @@ export default function AttendancePage() {
     setEntryMap({});
   }, [selectedSession]);
 
+  const createSessionMutation = useMutation({
+    mutationFn: createSession,
+    onSuccess: (session: Session) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      setSelectedSession(session.id);
+      setShowCreateSession(false);
+      toast.success('Тренировка добавлена');
+    },
+    onError: () => toast.error('Ошибка при создании тренировки'),
+  });
+
   const saveMutation = useMutation({
     mutationFn: (items: Array<{ athleteId: string; status: string; grade?: number | null }>) =>
       bulkMarkAttendance(selectedSession!, { items }),
@@ -168,6 +219,65 @@ export default function AttendancePage() {
     saveMutation.mutate(items);
   };
 
+  const getGroupCoachId = (groupId: string) => {
+    const group = groups.find((g) => g.id === groupId);
+    return group?.coachId ?? group?.coach?.id ?? 'none';
+  };
+
+  const getCoachName = (coach: Coach) =>
+    coach.fullName ?? coach.user?.fullName ?? 'Тренер';
+
+  const openCreateSession = () => {
+    const groupId = selectedGroup !== 'all' ? selectedGroup : groups[0]?.id ?? '';
+    if (!groupId) {
+      toast.error('Сначала добавьте группу');
+      return;
+    }
+
+    setSessionForm({
+      groupId,
+      coachId: getGroupCoachId(groupId),
+      startTime: '17:00',
+      endTime: '18:30',
+      location: '',
+      topic: '',
+    });
+    setShowCreateSession(true);
+  };
+
+  const handleSessionGroupChange = (groupId: string | null) => {
+    if (!groupId) return;
+    setSessionForm((prev) => ({
+      ...prev,
+      groupId,
+      coachId: getGroupCoachId(groupId),
+    }));
+  };
+
+  const handleCreateSession = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!sessionForm.groupId) {
+      toast.error('Выберите группу');
+      return;
+    }
+
+    if (sessionForm.startTime >= sessionForm.endTime) {
+      toast.error('Время окончания должно быть позже начала');
+      return;
+    }
+
+    createSessionMutation.mutate({
+      groupId: sessionForm.groupId,
+      coachId: sessionForm.coachId !== 'none' ? sessionForm.coachId : undefined,
+      sessionDate: selectedDate,
+      startTime: sessionForm.startTime,
+      endTime: sessionForm.endTime,
+      location: sessionForm.location.trim() || undefined,
+      topic: sessionForm.topic.trim() || undefined,
+    });
+  };
+
   const setStatus = (athleteId: string, status: 'present' | 'absent' | 'sick') => {
     setEntryMap((prev) => ({
       ...prev,
@@ -197,14 +307,7 @@ export default function AttendancePage() {
 
   const getSessionDateDisplay = (session: Session) => {
     const dateStr = session.sessionDate ?? session.date;
-    if (dateStr) {
-      try {
-        return new Date(dateStr).toLocaleDateString('ru-RU');
-      } catch {
-        return dateStr;
-      }
-    }
-    return '';
+    return dateStr ? formatDate(dateStr) : '';
   };
 
   return (
@@ -218,37 +321,43 @@ export default function AttendancePage() {
         {/* Filters */}
         <Card className="mb-4">
           <CardContent className="p-4">
-            <div className="flex flex-wrap gap-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Дата</label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => {
-                    setSelectedDate(e.target.value);
-                    setSelectedSession(null);
-                  }}
-                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                />
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex flex-wrap gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Дата</label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      setSelectedSession(null);
+                    }}
+                    className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Группа</label>
+                  <Select
+                    modal={false}
+                    value={selectedGroup}
+                    onValueChange={(v) => { setSelectedGroup(v ?? 'all'); setSelectedSession(null); }}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Все группы" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все группы</SelectItem>
+                      {groups.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Группа</label>
-                <Select
-                  modal={false}
-                  value={selectedGroup}
-                  onValueChange={(v) => { setSelectedGroup(v ?? 'all'); setSelectedSession(null); }}
-                >
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder="Все группы" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все группы</SelectItem>
-                    {groups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Button onClick={openCreateSession} className="w-full md:w-auto">
+                <Plus className="h-4 w-4 mr-1" />
+                Добавить тренировку
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -428,6 +537,109 @@ export default function AttendancePage() {
             )}
           </div>
         </div>
+
+        <Dialog open={showCreateSession} onOpenChange={setShowCreateSession}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Добавить тренировку</DialogTitle>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={handleCreateSession}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Группа</Label>
+                  <Select
+                    modal={false}
+                    value={sessionForm.groupId}
+                    onValueChange={handleSessionGroupChange}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Выберите группу" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groups.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Тренер</Label>
+                  <Select
+                    modal={false}
+                    value={sessionForm.coachId}
+                    onValueChange={(coachId) => setSessionForm((prev) => ({ ...prev, coachId: coachId ?? 'none' }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Выберите тренера" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Без тренера</SelectItem>
+                      {coaches.map((coach) => (
+                        <SelectItem key={coach.id} value={coach.id}>{getCoachName(coach)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="session-start">Начало</Label>
+                  <Input
+                    id="session-start"
+                    type="time"
+                    value={sessionForm.startTime}
+                    onChange={(e) => setSessionForm((prev) => ({ ...prev, startTime: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="session-end">Окончание</Label>
+                  <Input
+                    id="session-end"
+                    type="time"
+                    value={sessionForm.endTime}
+                    onChange={(e) => setSessionForm((prev) => ({ ...prev, endTime: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="session-location">Место</Label>
+                  <Input
+                    id="session-location"
+                    value={sessionForm.location}
+                    onChange={(e) => setSessionForm((prev) => ({ ...prev, location: e.target.value }))}
+                    placeholder="Например, Зал №1"
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="session-topic">Тема</Label>
+                  <Input
+                    id="session-topic"
+                    value={sessionForm.topic}
+                    onChange={(e) => setSessionForm((prev) => ({ ...prev, topic: e.target.value }))}
+                    placeholder="Например, ОФП и техника"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateSession(false)}
+                >
+                  Отмена
+                </Button>
+                <Button type="submit" disabled={createSessionMutation.isPending}>
+                  {createSessionMutation.isPending ? 'Создание...' : 'Создать'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

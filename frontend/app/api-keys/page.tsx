@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { formatDate } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,10 @@ const AVAILABLE_SCOPES = [
   { value: 'attendance:write', label: 'Запись посещаемости' },
   { value: 'documents:read', label: 'Чтение документов' },
 ];
+
+const scopeLabels = Object.fromEntries(
+  AVAILABLE_SCOPES.map((scope) => [scope.value, scope.label])
+);
 
 export default function ApiKeysPage() {
   const queryClient = useQueryClient();
@@ -178,7 +183,9 @@ export default function ApiKeysPage() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {key.scopes?.slice(0, 3).map((s) => (
-                            <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                            <Badge key={s} variant="outline" className="text-xs">
+                              {scopeLabels[s] ?? s}
+                            </Badge>
                           ))}
                           {(key.scopes?.length ?? 0) > 3 && (
                             <Badge variant="outline" className="text-xs">
@@ -187,12 +194,8 @@ export default function ApiKeysPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {key.createdAt ? new Date(key.createdAt).toLocaleDateString('ru-RU') : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString('ru-RU') : 'Никогда'}
-                      </TableCell>
+                      <TableCell>{formatDate(key.createdAt)}</TableCell>
+                      <TableCell>{key.lastUsedAt ? formatDate(key.lastUsedAt) : 'Никогда'}</TableCell>
                       <TableCell>
                         <Badge
                           className={key.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}

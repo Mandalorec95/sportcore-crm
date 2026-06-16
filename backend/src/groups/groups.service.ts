@@ -60,7 +60,13 @@ export class GroupsService {
   }
 
   async addMember(groupId: string, athleteId: string, orgId: string) {
-    await this.findOne(groupId, orgId);
+    const group = await this.findOne(groupId, orgId);
+    const count = await this.prisma.athlete.count({
+      where: { groupId, status: { not: 'archived' } },
+    });
+    if (count >= group.capacity) {
+      throw new Error(`Группа переполнена. Максимум ${group.capacity} спортсменов`);
+    }
     return this.prisma.athlete.update({
       where: { id: athleteId },
       data: { groupId },

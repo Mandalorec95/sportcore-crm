@@ -5,6 +5,7 @@ import { getDashboard } from '@/lib/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { formatDate } from '@/lib/utils';
 import {
   Users,
   UserCheck,
@@ -87,7 +88,7 @@ export default function DashboardPage() {
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Панель управления</h1>
           <p className="text-gray-500 mt-1">Обзор ключевых показателей вашего клуба</p>
         </div>
 
@@ -97,7 +98,18 @@ export default function DashboardPage() {
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
-            Ошибка загрузки данных
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold mb-1">Ошибка загрузки данных</p>
+                <p className="text-sm">Попытайтесь обновить страницу</p>
+              </div>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Обновить
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -166,11 +178,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {new Date(comp.date).toLocaleDateString('ru-RU', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
+                          {formatDate(comp.date)}
                         </Badge>
                       </div>
                     ))}

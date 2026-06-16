@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { clearAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { formatDate } from '@/lib/utils';
 
 interface Child {
   id: string;
@@ -153,7 +154,7 @@ export default function ParentPage() {
                   <div className="text-xs text-gray-500 mt-0.5">
                     Соревнование: <span className="font-medium">{a.competition?.name ?? '—'}</span>
                     {a.competition?.compDate && (
-                      <span> · {new Date(a.competition.compDate).toLocaleDateString('ru-RU')}</span>
+                      <span> · {formatDate(a.competition.compDate)}</span>
                     )}
                   </div>
                   {a.coach?.fullName && (
@@ -283,7 +284,7 @@ export default function ParentPage() {
                           {child.recentAttendance.slice(0, 6).map((a, i) => (
                             <div key={i} className="flex items-center justify-between text-sm py-1">
                               <span className="text-gray-500">
-                                {a.date ? new Date(a.date).toLocaleDateString('ru-RU') : '—'}
+                                {formatDate(a.date)}
                               </span>
                               <div className="flex items-center gap-2">
                                 {a.grade != null && (
@@ -315,7 +316,7 @@ export default function ParentPage() {
                                 <Badge variant="outline">{p.score}</Badge>
                                 {(p.measuredAt || p.date) && (
                                   <span className="text-xs text-gray-400">
-                                    {new Date(p.measuredAt || p.date || '').toLocaleDateString('ru-RU')}
+                                    {formatDate(p.measuredAt || p.date)}
                                   </span>
                                 )}
                               </div>
@@ -340,7 +341,7 @@ export default function ParentPage() {
                                 <div className="font-medium text-gray-700">{c.competition?.name}</div>
                                 {(c.competition?.compDate || c.competition?.date) && (
                                   <div className="text-xs text-gray-400">
-                                    {new Date(c.competition.compDate || c.competition.date || '').toLocaleDateString('ru-RU')}
+                                    {formatDate(c.competition.compDate || c.competition.date)}
                                   </div>
                                 )}
                               </div>

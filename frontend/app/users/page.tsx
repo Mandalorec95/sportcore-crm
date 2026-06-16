@@ -170,7 +170,7 @@ export default function UsersPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Поиск по имени, email, телефону..."
+                    placeholder="Поиск по имени, эл. почте, телефону..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9"
@@ -204,7 +204,7 @@ export default function UsersPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>ФИО</TableHead>
-                      <TableHead>Email / Логин</TableHead>
+                      <TableHead>Эл. почта / логин</TableHead>
                       <TableHead>Телефон</TableHead>
                       <TableHead>Роль</TableHead>
                       <TableHead className="text-right">Действия</TableHead>
@@ -273,8 +273,8 @@ export default function UsersPage() {
                 <Input id="fullName" name="fullName" required placeholder="Дудаев Мовлади" />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="email">Email (логин) *</Label>
-                <Input id="email" name="email" type="email" required placeholder="user@example.com" />
+                <Label htmlFor="email">Электронная почта (логин) *</Label>
+                <Input id="email" name="email" type="email" required placeholder="user@sportcrm.ru" />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="phone">Телефон</Label>
@@ -313,7 +313,7 @@ export default function UsersPage() {
                   <Input name="fullName" required defaultValue={editUser.fullName} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Email</Label>
+                  <Label>Электронная почта</Label>
                   <Input name="email" type="email" defaultValue={editUser.email} />
                 </div>
                 <div className="space-y-1">

@@ -111,7 +111,7 @@ export default function AdminProfilePage() {
                   <Input id="fullName" name="fullName" required defaultValue={user.fullName} />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Электронная почта</Label>
                   <Input id="email" name="email" type="email" required defaultValue={user.email} />
                 </div>
                 <div className="space-y-1">
@@ -140,7 +140,7 @@ export default function AdminProfilePage() {
                 <div className="flex items-center gap-3">
                   <Mail className="h-4 w-4 text-gray-400" />
                   <div>
-                    <div className="text-xs text-gray-500">Email (логин)</div>
+                    <div className="text-xs text-gray-500">Электронная почта (логин)</div>
                     <div className="font-medium">{user.email}</div>
                   </div>
                 </div>

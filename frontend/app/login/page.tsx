@@ -55,7 +55,9 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error.response?.data?.message || 'Неверный логин или пароль');
+      const message = error?.response?.data?.message || 'Неверный логин или пароль';
+      toast.error(message);
+      console.error('Ошибка логина:', error);
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Электронная почта</Label>
                 <Input
                   id="email"
                   type="email"

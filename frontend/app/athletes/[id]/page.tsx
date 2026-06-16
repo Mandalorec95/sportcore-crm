@@ -36,6 +36,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { formatDate } from '@/lib/utils';
 import {
   User,
   Calendar,
@@ -125,6 +126,7 @@ export default function AthletePassportPage() {
   const [showAddProgress, setShowAddProgress] = useState(false);
   const [showEditAthlete, setShowEditAthlete] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState('profile');
 
   const { data: passport, isLoading } = useQuery<Passport>({
     queryKey: ['athlete-passport', id],
@@ -261,7 +263,7 @@ export default function AthletePassportPage() {
               {athlete.birthDate && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
-                  {calculateAge(athlete.birthDate)} лет ({new Date(athlete.birthDate).toLocaleDateString('ru-RU')})
+                  {calculateAge(athlete.birthDate)} лет ({formatDate(athlete.birthDate)})
                 </span>
               )}
               {athlete.sportType && <span>{athlete.sportType}</span>}
@@ -301,7 +303,7 @@ export default function AthletePassportPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="profile">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="profile">
               <User className="h-4 w-4 mr-1.5" />
@@ -336,7 +338,7 @@ export default function AthletePassportPage() {
                 <CardHeader><CardTitle className="text-base">Личные данные</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <InfoRow label="ФИО" value={athlete.fullName} />
-                  <InfoRow label="Дата рождения" value={athlete.birthDate ? new Date(athlete.birthDate).toLocaleDateString('ru-RU') : '—'} />
+                  <InfoRow label="Дата рождения" value={formatDate(athlete.birthDate)} />
                   <InfoRow label="Вид спорта" value={athlete.sportType || '—'} />
                   <InfoRow label="Уровень" value={athlete.level || '—'} />
                 </CardContent>
@@ -415,7 +417,7 @@ export default function AthletePassportPage() {
                           <TableCell className="font-medium">{p.skillName}</TableCell>
                           <TableCell><Badge variant="outline">{p.score}</Badge></TableCell>
                           <TableCell className="text-gray-500 text-sm">{p.comment || '—'}</TableCell>
-                          <TableCell>{p.measuredAt ? new Date(p.measuredAt).toLocaleDateString('ru-RU') : '—'}</TableCell>
+                          <TableCell>{formatDate(p.measuredAt)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -453,7 +455,7 @@ export default function AthletePassportPage() {
                           <TableCell>{p.periodMonth || '—'}</TableCell>
                           <TableCell>{p.amount?.toLocaleString('ru-RU')} ₽</TableCell>
                           <TableCell>{(p.paidAmount ?? 0).toLocaleString('ru-RU')} ₽</TableCell>
-                          <TableCell>{p.dueDate ? new Date(p.dueDate).toLocaleDateString('ru-RU') : '—'}</TableCell>
+                          <TableCell>{formatDate(p.dueDate)}</TableCell>
                           <TableCell>{p.status ? <StatusBadge status={p.status} /> : '—'}</TableCell>
                         </TableRow>
                       ))}
@@ -489,8 +491,8 @@ export default function AthletePassportPage() {
                         return (
                           <TableRow key={d.id}>
                             <TableCell className="font-medium">{d.docType || '—'}</TableCell>
-                            <TableCell>{d.issuedAt ? new Date(d.issuedAt).toLocaleDateString('ru-RU') : '—'}</TableCell>
-                            <TableCell>{d.validUntil ? new Date(d.validUntil).toLocaleDateString('ru-RU') : '—'}</TableCell>
+                            <TableCell>{formatDate(d.issuedAt)}</TableCell>
+                            <TableCell>{formatDate(d.validUntil)}</TableCell>
                             <TableCell>
                               {daysLeft != null ? (
                                 <span className={daysLeft < 0 ? 'text-red-600' : daysLeft < 14 ? 'text-yellow-600' : 'text-green-600'}>
@@ -539,7 +541,7 @@ export default function AthletePassportPage() {
                           <TableCell>
                             <Badge variant="outline">{p.score ?? '—'}</Badge>
                           </TableCell>
-                          <TableCell>{(p.measuredAt || p.date) ? new Date(p.measuredAt || p.date!).toLocaleDateString('ru-RU') : '—'}</TableCell>
+                          <TableCell>{formatDate(p.measuredAt || p.date)}</TableCell>
                           <TableCell className="text-gray-500 text-sm">{p.comment || p.notes || '—'}</TableCell>
                         </TableRow>
                       ))}
@@ -598,7 +600,7 @@ export default function AthletePassportPage() {
                       {competitions.map((c) => (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">{c.competition?.name || '—'}</TableCell>
-                          <TableCell>{c.competition?.compDate ? new Date(c.competition.compDate).toLocaleDateString('ru-RU') : '—'}</TableCell>
+                          <TableCell>{formatDate(c.competition?.compDate)}</TableCell>
                           <TableCell>{c.discipline || '—'}</TableCell>
                           <TableCell>{c.category || '—'}</TableCell>
                           <TableCell>
@@ -643,7 +645,7 @@ export default function AthletePassportPage() {
             </div>
             <div className="space-y-1">
               <Label>Вид спорта</Label>
-              <Input name="sportType" placeholder="sambo, boxing..." defaultValue={athlete.sportType || ''} />
+              <Input name="sportType" placeholder="Самбо, бокс..." defaultValue={athlete.sportType || ''} />
             </div>
             <div className="space-y-1">
               <Label>Уровень</Label>

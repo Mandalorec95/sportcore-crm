@@ -26,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bell, Info, AlertCircle, CheckCircle, Check, Trash2, Plus, Edit, ListTodo, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate, formatDateTime } from '@/lib/utils';
 
 interface Notification {
   id: string;
@@ -265,9 +266,7 @@ export default function NotificationsPage() {
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {n.createdAt && (
                                 <span className="text-xs text-gray-400">
-                                  {new Date(n.createdAt).toLocaleDateString('ru-RU', {
-                                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                                  })}
+                                  {formatDateTime(n.createdAt)}
                                 </span>
                               )}
                               {!n.isRead && (
@@ -355,7 +354,7 @@ export default function NotificationsPage() {
                                 {t.dueDate && (
                                   <span className="flex items-center gap-0.5 text-xs text-gray-500">
                                     <Calendar className="h-3 w-3" />
-                                    {new Date(t.dueDate).toLocaleDateString('ru-RU')}
+                                    {formatDate(t.dueDate)}
                                   </span>
                                 )}
                               </div>

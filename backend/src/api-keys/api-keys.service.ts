@@ -35,18 +35,25 @@ export class ApiKeysService {
   }
 
   async validateKey(rawKey: string, requiredScope?: string): Promise<{ orgId: string; scopes: string[] }> {
-    const allKeys = await this.prisma.apiKey.findMany({ where: { isActive: true } });
+    const keyPrefix = rawKey.slice(0, 14);
+    const key = await this.prisma.apiKey.findFirst({
+      where: { keyPrefix, isActive: true }
+    });
 
-    for (const key of allKeys) {
-      const valid = await bcrypt.compare(rawKey, key.keyHash);
-      if (valid) {
-        if (requiredScope && !key.scopes.includes(requiredScope)) {
-          throw new UnauthorizedException('Недостаточно прав API-ключа');
-        }
-        await this.prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
-        return { orgId: key.orgId, scopes: key.scopes };
-      }
+    if (!key) {
+      throw new UnauthorizedException('Недействительный API-ключ');
     }
-    throw new UnauthorizedException('Недействительный API-ключ');
+
+    const valid = await bcrypt.compare(rawKey, key.keyHash);
+    if (!valid) {
+      throw new UnauthorizedException('Недействительный API-ключ');
+    }
+
+    if (requiredScope && !key.scopes.includes(requiredScope)) {
+      throw new UnauthorizedException('Недостаточно прав API-ключа');
+    }
+
+    await this.prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
+    return { orgId: key.orgId, scopes: key.scopes };
   }
 }

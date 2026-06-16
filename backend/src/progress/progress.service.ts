@@ -6,9 +6,14 @@ import { CreateProgressDto } from './dto/create-progress.dto';
 export class ProgressService {
   constructor(private prisma: PrismaService) {}
 
-  async findByAthlete(athleteId: string) {
+  async findByAthlete(athleteId: string, orgId?: string) {
+    const where: any = { athleteId };
+    if (orgId) {
+      where.athlete = { orgId };
+    }
+
     const records = await this.prisma.progressRecord.findMany({
-      where: { athleteId },
+      where,
       include: { coach: { include: { user: true } } },
       orderBy: { measuredAt: 'desc' },
     });

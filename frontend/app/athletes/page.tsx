@@ -306,8 +306,8 @@ export default function AthletesPage() {
                   <Input id="parentPhone" name="parentPhone" placeholder="+7 999 000 00 00" />
                 </div>
                 <div className="col-span-2 space-y-1">
-                  <Label htmlFor="parentEmail">Email родителя</Label>
-                  <Input id="parentEmail" name="parentEmail" type="email" placeholder="parent@example.com" />
+                  <Label htmlFor="parentEmail">Электронная почта родителя</Label>
+                  <Input id="parentEmail" name="parentEmail" type="email" placeholder="parent@sportcrm.ru" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">

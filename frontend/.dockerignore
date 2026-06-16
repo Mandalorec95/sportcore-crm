@@ -1,0 +1,36 @@
+# Dependencies (but NOT package-lock.json - we need it!)
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+.next
+out
+dist
+build
+coverage
+.turbo
+
+# Logs and temp files
+logs
+*.log
+.DS_Store
+
+# VCS
+.git
+.gitignore
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Project specific
+.vercel

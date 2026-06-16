@@ -601,7 +601,7 @@ export default function CompetitionsPage() {
               </div>
               <div className="space-y-1">
                 <Label>Вид спорта</Label>
-                <Input name="sportType" placeholder="sambo, boxing..." />
+                <Input name="sportType" placeholder="Самбо, бокс..." />
               </div>
               <div className="space-y-1">
                 <Label>Описание</Label>

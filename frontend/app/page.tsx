@@ -2,19 +2,22 @@
 
 import { useEffect } from 'react';
 import { getUser, getToken } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const router = useRouter();
+
   useEffect(() => {
     const token = getToken();
     const user = getUser();
     if (!token || !user) {
-      window.location.href = '/login';
+      router.replace('/login');
     } else if (user.role === 'parent') {
-      window.location.href = '/parent';
+      router.replace('/parent');
     } else {
-      window.location.href = '/dashboard';
+      router.replace('/dashboard');
     }
-  }, []);
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

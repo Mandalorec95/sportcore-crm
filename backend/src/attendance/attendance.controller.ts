@@ -12,6 +12,12 @@ import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
 
+  @Get('athletes/readiness')
+  @ApiOperation({ summary: 'Готовность всех спортсменов к соревнованиям' })
+  getAllReadiness(@CurrentUser() user: any) {
+    return this.attendanceService.getAllAthletesReadiness(user.orgId);
+  }
+
   @Get('sessions/:sessionId/attendance')
   @ApiOperation({ summary: 'Посещаемость на тренировке' })
   getSessionAttendance(@Param('sessionId') sessionId: string) {
@@ -38,11 +44,5 @@ export class AttendanceController {
   @ApiOperation({ summary: 'Статистика посещаемости спортсмена' })
   getAthleteStats(@Param('athleteId') athleteId: string, @CurrentUser() user: any) {
     return this.attendanceService.getAthleteStats(athleteId, user.orgId);
-  }
-
-  @Get('athletes/readiness')
-  @ApiOperation({ summary: 'Готовность всех спортсменов к соревнованиям' })
-  getAllReadiness(@CurrentUser() user: any) {
-    return this.attendanceService.getAllAthletesReadiness(user.orgId);
   }
 }
