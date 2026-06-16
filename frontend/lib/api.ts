@@ -120,6 +120,15 @@ export const updateMedicalDocument = (id: string, data: Record<string, unknown>)
 export const deleteMedicalDocument = (id: string) =>
   api.delete(`/medical-documents/${id}`).then((r) => r.data);
 
+export const requestParentConsent = (athleteId: string) =>
+  api.post(`/medical-documents/athletes/${athleteId}/parent-consent/request`).then((r) => r.data);
+
+export const getParentConsentRequests = () =>
+  api.get('/parent/consent-requests').then((r) => r.data);
+
+export const respondParentConsent = (id: string, status: 'approved' | 'rejected') =>
+  api.patch(`/parent/consent-requests/${id}/respond`, { status }).then((r) => r.data);
+
 // Competitions
 export const getCompetitions = () =>
   api.get('/competitions').then((r) => r.data);

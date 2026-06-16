@@ -40,7 +40,7 @@ export class MedicalDocumentsController {
 
   @Post('medical-documents')
   @ApiOperation({ summary: 'Создать документ' })
-  createDoc(@Body() body: CreateMedicalDocWithAthleteDto) {
+  createDoc(@Body() body: CreateMedicalDocWithAthleteDto, @CurrentUser() user: any) {
     return this.medDocService.create(body.athleteId, body as any);
   }
 
@@ -48,6 +48,24 @@ export class MedicalDocumentsController {
   @ApiOperation({ summary: 'Обновить документ' })
   update(@Param('id') id: string, @Body() body: UpdateMedicalDocDto) {
     return this.medDocService.update(id, body);
+  }
+
+  @Post('medical-documents/athletes/:athleteId/parent-consent/request')
+  @ApiOperation({ summary: 'Отправить запрос родительского согласия' })
+  requestParentConsent(@Param('athleteId') athleteId: string, @CurrentUser() user: any) {
+    return this.medDocService.requestParentConsent(athleteId, user.orgId, user);
+  }
+
+  @Get('parent/consent-requests')
+  @ApiOperation({ summary: 'Запросы родительского согласия' })
+  getParentConsentRequests(@CurrentUser() user: any) {
+    return this.medDocService.getParentConsentRequests(user);
+  }
+
+  @Patch('parent/consent-requests/:id/respond')
+  @ApiOperation({ summary: 'Ответить на запрос родительского согласия' })
+  respondParentConsent(@Param('id') id: string, @Body() body: { status: 'approved' | 'rejected' }, @CurrentUser() user: any) {
+    return this.medDocService.respondParentConsent(id, user, body.status);
   }
 
   @Delete('medical-documents/:id')

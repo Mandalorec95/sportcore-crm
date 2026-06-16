@@ -9,6 +9,7 @@ import {
   updateMedicalDocument,
   deleteMedicalDocument,
   getAthletes,
+  requestParentConsent,
 } from '@/lib/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -43,6 +44,11 @@ interface MedDocument {
   validUntil?: string;
   daysLeft?: number;
   status?: string;
+  requestedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  requestedByUserId?: string;
+  approvedByParentId?: string;
 }
 
 interface Athlete {
@@ -52,15 +58,21 @@ interface Athlete {
 
 const DOC_TYPES = [
   { value: 'medical_cert', label: 'Медицинская справка' },
+  { value: 'parental_consent', label: 'Родительское согласие' },
 ];
 
 const MEDICAL_CERT_DOC_TYPE = 'medical_cert';
+const PARENT_CONSENT_DOC_TYPE = 'parental_consent';
 const MEDICAL_CERT_LABEL = 'Медицинская справка';
+const PARENT_CONSENT_LABEL = 'Родительское согласие';
 
 const DOCUMENT_STATUS_LABELS: Record<string, string> = {
   valid: 'действует действительно',
   expires_soon: 'истекает скоро требует внимания',
   expired: 'истекло просрочено',
+  pending: 'ожидание ожидает подтверждения запрос отправлен',
+  approved: 'подтверждено согласие получено',
+  rejected: 'отклонено отказ',
 };
 
 const normalizeSearch = (value?: string | number | null) =>
@@ -81,6 +93,7 @@ export default function DocumentsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
+  const [createDocType, setCreateDocType] = useState(MEDICAL_CERT_DOC_TYPE);
 
   const { data: allDocs = [], isLoading: allLoading } = useQuery<MedDocument[]>({
     queryKey: ['medical-documents'],
@@ -118,9 +131,22 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ['medical-documents'] });
       queryClient.invalidateQueries({ queryKey: ['expiring-docs'] });
       setEditDoc(null);
-      toast.success('Документ обновлён');
+      toast.success('Документ успешно обновлён');
     },
-    onError: () => toast.error('Ошибка при обновлении'),
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Ошибка при обновлении'),
+  });
+
+  const consentRequestMutation = useMutation({
+    mutationFn: (athleteId: string) => requestParentConsent(athleteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medical-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['expiring-docs'] });
+      setShowCreate(false);
+      setAthleteSearch('');
+      setCreateDocType(MEDICAL_CERT_DOC_TYPE);
+      toast.success('Запрос родителю отправлен');
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Не удалось отправить запрос родителю'),
   });
 
   const deleteMutation = useMutation({
@@ -143,6 +169,11 @@ export default function DocumentsPage() {
 
     if (!athlete) {
       toast.error('Выберите ученика из списка');
+      return;
+    }
+
+    if (createDocType === PARENT_CONSENT_DOC_TYPE) {
+      consentRequestMutation.mutate(athlete.id);
       return;
     }
 
@@ -178,19 +209,27 @@ export default function DocumentsPage() {
     return '';
   };
 
+  const getDocTypeLabel = (docType?: string) =>
+    DOC_TYPES.find((type) => type.value === docType)?.label
+      ?? (docType === 'medical_certificate' ? MEDICAL_CERT_LABEL : docType || '—');
+
   const isMedicalCertDoc = (doc: MedDocument) =>
     !doc.docType || doc.docType === MEDICAL_CERT_DOC_TYPE || doc.docType === 'medical_certificate';
 
+  const isParentConsentDoc = (doc: MedDocument) => doc.docType === PARENT_CONSENT_DOC_TYPE;
+
   const filterDocuments = (docs: MedDocument[]) => docs.filter((doc) => {
-    if (!isMedicalCertDoc(doc)) return false;
     if (!normalizedSearch) return true;
     const daysLeft = doc.validUntil ? getDaysLeft(doc.validUntil) : (doc.daysLeft ?? null);
     const searchable = [
       getAthleteFullName(doc),
       doc.athlete?.group?.name,
-      MEDICAL_CERT_LABEL,
+      getDocTypeLabel(doc.docType),
       doc.issuedAt,
       doc.validUntil,
+      doc.requestedAt,
+      doc.approvedAt,
+      doc.rejectedAt,
       daysLeft,
       doc.status,
       doc.status ? DOCUMENT_STATUS_LABELS[doc.status] : '',
@@ -219,6 +258,7 @@ export default function DocumentsPage() {
               <TableRow>
                 <TableHead>Спортсмен</TableHead>
                 <TableHead>Группа</TableHead>
+                <TableHead>Тип</TableHead>
                 <TableHead>Выдан</TableHead>
                 <TableHead>Действует до</TableHead>
                 <TableHead>Дней осталось</TableHead>
@@ -234,10 +274,13 @@ export default function DocumentsPage() {
                   <TableRow key={doc.id} className={rowClass}>
                     <TableCell className="font-medium">{getAthleteFullName(doc)}</TableCell>
                     <TableCell>{doc.athlete?.group?.name || '—'}</TableCell>
-                    <TableCell>{formatDate(doc.issuedAt)}</TableCell>
-                    <TableCell>{formatDate(doc.validUntil)}</TableCell>
+                    <TableCell>{getDocTypeLabel(doc.docType)}</TableCell>
+                    <TableCell>{isParentConsentDoc(doc) ? formatDate(doc.requestedAt) : formatDate(doc.issuedAt)}</TableCell>
+                    <TableCell>{isParentConsentDoc(doc) ? formatDate(doc.approvedAt || doc.rejectedAt) : formatDate(doc.validUntil)}</TableCell>
                     <TableCell>
-                      {daysLeft != null ? (
+                      {isParentConsentDoc(doc) ? (
+                        doc.status === 'approved' ? 'согласие получено' : doc.status === 'pending' ? 'ожидает ответа' : '—'
+                      ) : daysLeft != null ? (
                         <span className={daysLeft < 0 ? 'text-red-700 font-bold' : daysLeft < 14 ? 'text-yellow-700 font-semibold' : 'text-green-700'}>
                           {daysLeft < 0 ? `истекло ${Math.abs(daysLeft)} дн. назад` : `${daysLeft} дн.`}
                         </span>
@@ -248,9 +291,11 @@ export default function DocumentsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => setEditDoc(doc)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        {isMedicalCertDoc(doc) && (
+                          <Button size="sm" variant="ghost" onClick={() => setEditDoc(doc)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" className="text-red-500" onClick={() => setDeleteId(doc.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -272,7 +317,7 @@ export default function DocumentsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Медицинские документы</h1>
-            <p className="text-gray-500 mt-1">Контроль сроков действия медицинских справок</p>
+            <p className="text-gray-500 mt-1">Контроль медсправок и родительских согласий</p>
           </div>
           <Button onClick={() => setShowCreate(true)} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
@@ -299,7 +344,7 @@ export default function DocumentsPage() {
         <Tabs defaultValue="all">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <TabsList>
-              <TabsTrigger value="all">Все справки ({filteredAllDocs.length})</TabsTrigger>
+              <TabsTrigger value="all">Все документы ({filteredAllDocs.length})</TabsTrigger>
               <TabsTrigger value="expiring" className="text-yellow-600">
                 Требуют внимания ({filteredExpiringDocs.length})
               </TabsTrigger>
@@ -329,7 +374,10 @@ export default function DocumentsPage() {
           open={showCreate}
           onOpenChange={(open) => {
             setShowCreate(open);
-            if (!open) setAthleteSearch('');
+            if (!open) {
+              setAthleteSearch('');
+              setCreateDocType(MEDICAL_CERT_DOC_TYPE);
+            }
           }}
         >
           <DialogContent>
@@ -352,17 +400,40 @@ export default function DocumentsPage() {
                 </datalist>
               </div>
               <div className="space-y-1">
-                <Label>Дата выдачи</Label>
-                <Input name="issuedAt" type="date" />
+                <Label htmlFor="docType">Тип документа *</Label>
+                <select
+                  id="docType"
+                  value={createDocType}
+                  onChange={(e) => setCreateDocType(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                >
+                  {DOC_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
               </div>
-              <div className="space-y-1">
-                <Label>Действует до *</Label>
-                <Input name="validUntil" type="date" required />
-              </div>
+              {createDocType === MEDICAL_CERT_DOC_TYPE ? (
+                <>
+                  <div className="space-y-1">
+                    <Label>Дата выдачи</Label>
+                    <Input name="issuedAt" type="date" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Действует до *</Label>
+                    <Input name="validUntil" type="date" required />
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                  Родителю будет отправлено уведомление с просьбой подтвердить допуск ребёнка к занятиям.
+                </div>
+              )}
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Отмена</Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Сохранение...' : 'Добавить'}
+                <Button type="submit" disabled={createMutation.isPending || consentRequestMutation.isPending}>
+                  {createDocType === PARENT_CONSENT_DOC_TYPE
+                    ? consentRequestMutation.isPending ? 'Отправка...' : 'Отправить запрос родителю'
+                    : createMutation.isPending ? 'Сохранение...' : 'Добавить'}
                 </Button>
               </div>
             </form>

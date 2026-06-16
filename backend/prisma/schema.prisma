@@ -48,6 +48,10 @@ enum DocumentType {
 }
 
 enum DocumentStatus {
+  not_requested
+  pending
+  approved
+  rejected
   valid
   expires_soon
   expired
@@ -315,14 +319,20 @@ model Payment {
 }
 
 model MedicalDocument {
-  id         String         @id @default(uuid())
-  athleteId  String         @map("athlete_id")
-  docType    DocumentType   @map("doc_type")
-  issuedAt   DateTime?      @map("issued_at") @db.Date
-  validUntil DateTime       @map("valid_until") @db.Date
-  fileUrl    String?        @map("file_url")
-  status     DocumentStatus @default(valid)
-  createdAt  DateTime       @default(now()) @map("created_at")
+  id                 String         @id @default(uuid())
+  athleteId          String         @map("athlete_id")
+  docType            DocumentType   @map("doc_type")
+  issuedAt           DateTime?      @map("issued_at") @db.Date
+  validUntil         DateTime       @map("valid_until") @db.Date
+  fileUrl            String?        @map("file_url")
+  status             DocumentStatus @default(valid)
+  requestedByUserId  String?        @map("requested_by_user_id")
+  approvedByParentId String?        @map("approved_by_parent_id")
+  requestedAt        DateTime?      @map("requested_at")
+  approvedAt         DateTime?      @map("approved_at")
+  rejectedAt         DateTime?      @map("rejected_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at")
 
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 

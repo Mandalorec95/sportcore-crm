@@ -35,7 +35,11 @@ export class ParentsService {
         fullName: `${ap.athlete.firstName} ${ap.athlete.lastName}`,
         group: ap.athlete.group?.name ?? null,
         hasDebt: ap.athlete.payments.length > 0,
-        medicalStatus: ap.athlete.medicalDocuments[0]?.status ?? null,
+        medicalStatus:
+          ap.athlete.medicalDocuments.find((doc) => doc.docType === 'medical_cert' && doc.status !== 'expired')?.status ??
+          ap.athlete.medicalDocuments.find((doc) => doc.docType === 'parental_consent' && doc.status === 'approved')?.status ??
+          ap.athlete.medicalDocuments[0]?.status ??
+          null,
       })),
     }));
   }
@@ -69,6 +73,10 @@ export class ParentsService {
       const rate = a.attendances.length > 0 ? Math.round((attended / a.attendances.length) * 100) : 0;
       const grades = a.attendances.filter((x) => x.grade != null).map((x) => x.grade as number);
       const avgGrade = grades.length > 0 ? Math.round((grades.reduce((s, g) => s + g, 0) / grades.length) * 10) / 10 : null;
+      const admissionDocument =
+        a.medicalDocuments.find((doc) => doc.docType === 'medical_cert' && doc.status !== 'expired') ??
+        a.medicalDocuments.find((doc) => doc.docType === 'parental_consent' && doc.status === 'approved') ??
+        a.medicalDocuments[0];
 
       return {
         id: a.id,
@@ -85,6 +93,7 @@ export class ParentsService {
           : null,
         attendanceRate: rate,
         avgGrade,
+        medicalStatus: admissionDocument?.status ?? null,
         payments: a.payments,
         medicalDocuments: a.medicalDocuments,
         recentProgress: a.progressRecords,

@@ -16,6 +16,9 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   valid: { label: 'Действует', className: 'bg-green-100 text-green-800 border-green-200' },
   expires_soon: { label: 'Истекает', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
   expired: { label: 'Истекло', className: 'bg-red-100 text-red-800 border-red-200' },
+  not_requested: { label: 'Не запрошено', className: 'bg-gray-100 text-gray-800 border-gray-200' },
+  approved: { label: 'Подтверждено', className: 'bg-green-100 text-green-800 border-green-200' },
+  rejected: { label: 'Отклонено', className: 'bg-red-100 text-red-800 border-red-200' },
   // Attendance
   present: { label: 'Присутствовал', className: 'bg-green-100 text-green-800 border-green-200' },
   absent: { label: 'Отсутствовал', className: 'bg-red-100 text-red-800 border-red-200' },

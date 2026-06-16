@@ -1,7 +1,13 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getMyChildren, getParentApprovals, respondToApproval } from '@/lib/api';
+import {
+  getMyChildren,
+  getParentApprovals,
+  getParentConsentRequests,
+  respondToApproval,
+  respondParentConsent,
+} from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -58,6 +64,20 @@ interface CompetitionApproval {
   coach?: { fullName?: string };
 }
 
+interface ConsentRequest {
+  id: string;
+  status: string;
+  requestedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  athlete?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    group?: { name?: string; coach?: { userId?: string } };
+  };
+}
+
 export default function ParentPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -80,6 +100,12 @@ export default function ParentPage() {
     enabled: !!user,
   });
 
+  const { data: consentRequests = [] } = useQuery<ConsentRequest[]>({
+    queryKey: ['parent-consent-requests'],
+    queryFn: getParentConsentRequests,
+    enabled: !!user,
+  });
+
   const respondMutation = useMutation({
     mutationFn: ({ competitionId, athleteId, status }: { competitionId: string; athleteId: string; status: 'approved' | 'rejected' }) =>
       respondToApproval(competitionId, athleteId, status),
@@ -90,12 +116,24 @@ export default function ParentPage() {
     onError: () => toast.error('Ошибка при отправке ответа'),
   });
 
+  const consentMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'approved' | 'rejected' }) =>
+      respondParentConsent(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parent-consent-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['my-children'] });
+      toast.success('Ответ по согласию отправлен');
+    },
+    onError: () => toast.error('Ошибка при отправке ответа'),
+  });
+
   const handleLogout = () => {
     clearAuth();
     router.push('/login');
   };
 
   const pendingApprovals = approvals.filter((a) => a.status === 'pending');
+  const pendingConsents = consentRequests.filter((request) => request.status === 'pending');
 
   if (loading || isLoading) {
     return (
@@ -137,6 +175,55 @@ export default function ParentPage() {
         <p className="text-gray-500 mb-4">Информация о ваших детях</p>
 
         {/* Pending approvals banner */}
+        {pendingConsents.length > 0 && (
+          <Card className="mb-6 border-yellow-200 bg-yellow-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base text-yellow-800 flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Запросы согласия на занятия ({pendingConsents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pendingConsents.map((request) => {
+                const athleteName = `${request.athlete?.firstName ?? ''} ${request.athlete?.lastName ?? ''}`.trim() || '—';
+                return (
+                  <div key={request.id} className="bg-white rounded-lg border border-yellow-100 p-3">
+                    <div className="font-medium text-gray-900 text-sm">{athleteName}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Подтвердите согласие на допуск ребёнка к занятиям.
+                      {request.athlete?.group?.name && (
+                        <span> Группа: <span className="font-medium">{request.athlete.group.name}</span></span>
+                      )}
+                    </div>
+                    {request.requestedAt && (
+                      <div className="text-xs text-gray-400">Запрос отправлен: {formatDate(request.requestedAt)}</div>
+                    )}
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                        onClick={() => consentMutation.mutate({ id: request.id, status: 'approved' })}
+                        disabled={consentMutation.isPending}
+                      >
+                        Подтвердить согласие
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-200 hover:bg-red-50 h-7 text-xs"
+                        onClick={() => consentMutation.mutate({ id: request.id, status: 'rejected' })}
+                        disabled={consentMutation.isPending}
+                      >
+                        Отклонить
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+
         {pendingApprovals.length > 0 && (
           <Card className="mb-6 border-orange-200 bg-orange-50">
             <CardHeader className="pb-2">

@@ -56,8 +56,9 @@ export class AthletesService {
     const attendanceRate = totalSessions > 0 ? Math.round((attended / totalSessions) * 100) : 0;
 
     const debtPayment = athlete.payments.find((p) => p.status === 'debt' || p.status === 'partial');
-    const medValid = athlete.medicalDocuments.find((d) => d.docType === 'medical_cert');
-    const medStatus = medValid?.status ?? 'none';
+    const medValid = athlete.medicalDocuments.find((d) => d.docType === 'medical_cert' && d.status !== 'expired');
+    const parentConsent = athlete.medicalDocuments.find((d) => d.docType === 'parental_consent' && d.status === 'approved');
+    const medStatus = medValid?.status ?? (parentConsent ? 'approved' : 'none');
 
     const lastProgress = athlete.progressRecords.slice(0, 5);
     const avgScore = lastProgress.length
@@ -208,7 +209,7 @@ export class AthletesService {
     let score = 0;
     score += (attendanceRate / 100) * 35;
     score += (avgScore / 5) * 25;
-    if (medStatus === 'valid') score += 15;
+    if (medStatus === 'valid' || medStatus === 'approved') score += 15;
     else if (medStatus === 'expires_soon') score += 8;
     if (attendanceRate >= 85) score += 15;
     else if (attendanceRate >= 70) score += 8;
@@ -216,7 +217,10 @@ export class AthletesService {
   }
 
   private mapAthleteList(a: any) {
-    const medDoc = a.medicalDocuments?.[0];
+    const medDoc =
+      a.medicalDocuments?.find((d: any) => d.docType === 'medical_cert' && d.status !== 'expired') ??
+      a.medicalDocuments?.find((d: any) => d.docType === 'parental_consent' && d.status === 'approved') ??
+      a.medicalDocuments?.[0];
     const payment = a.payments?.[0];
     const parent = a.athleteParents?.[0]?.parent;
     return {

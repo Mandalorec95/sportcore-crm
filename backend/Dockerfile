@@ -53,7 +53,6 @@ RUN npm install ts-node@^10.9.2 typescript@^5.7.3
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Copy Prisma schema and config
 COPY prisma ./prisma
