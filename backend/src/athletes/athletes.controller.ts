@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AthletesService } from './athletes.service';
+import { AttendanceService } from '../attendance/attendance.service';
 import { CreateAthleteDto } from './dto/create-athlete.dto';
 import { UpdateAthleteDto } from './dto/update-athlete.dto';
 
@@ -11,7 +12,10 @@ import { UpdateAthleteDto } from './dto/update-athlete.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('athletes')
 export class AthletesController {
-  constructor(private athletesService: AthletesService) {}
+  constructor(
+    private athletesService: AthletesService,
+    private attendanceService: AttendanceService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Список спортсменов' })
@@ -23,6 +27,12 @@ export class AthletesController {
   @ApiOperation({ summary: 'Создать спортсмена' })
   create(@Body() dto: CreateAthleteDto, @CurrentUser() user: any) {
     return this.athletesService.create(dto, user.orgId);
+  }
+
+  @Get('readiness')
+  @ApiOperation({ summary: 'Готовность всех спортсменов к соревнованиям' })
+  getAllReadiness(@CurrentUser() user: any) {
+    return this.attendanceService.getAllAthletesReadiness(user.orgId);
   }
 
   @Get(':id')
