@@ -39,14 +39,15 @@ export class GroupsController {
 
   @Post(':id/members')
   @ApiOperation({ summary: 'Добавить спортсмена в группу' })
-  addMember(@Param('id') id: string, @Body() body: { athleteId: string }, @CurrentUser() user: any) {
-    return this.groupsService.addMember(id, body.athleteId, user.orgId);
+  addMember(@Param('id') id: string, @Body() body: { athleteId?: string; athleteIds?: string[] }, @CurrentUser() user: any) {
+    const athleteIds = body.athleteIds ?? (body.athleteId ? [body.athleteId] : []);
+    return this.groupsService.addMember(id, athleteIds, user.orgId, user);
   }
 
   @Delete(':id/members/:athleteId')
   @ApiOperation({ summary: 'Убрать спортсмена из группы' })
   removeMember(@Param('id') id: string, @Param('athleteId') athleteId: string, @CurrentUser() user: any) {
-    return this.groupsService.removeMember(id, athleteId, user.orgId);
+    return this.groupsService.removeMember(id, athleteId, user.orgId, user);
   }
 
   @Delete(':id')

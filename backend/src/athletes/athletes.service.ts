@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAthleteDto } from './dto/create-athlete.dto';
 import { UpdateAthleteDto } from './dto/update-athlete.dto';
@@ -12,6 +12,7 @@ export class AthletesService {
     const where: any = { orgId };
     if (query.groupId) where.groupId = query.groupId;
     if (query.status) where.status = query.status;
+    else where.status = { not: 'archived' };
 
     const athletes = await this.prisma.athlete.findMany({
       where,
@@ -163,9 +164,34 @@ export class AthletesService {
     return this.findOne(id, orgId);
   }
 
-  async remove(id: string, orgId: string) {
-    await this.findOne(id, orgId);
-    await this.prisma.athlete.update({ where: { id }, data: { status: 'archived' } });
+  async remove(id: string, orgId: string, user?: any) {
+    const athlete = await this.prisma.athlete.findFirst({
+      where: { id, orgId },
+      include: {
+        group: { include: { coach: true } },
+      },
+    });
+    if (!athlete) throw new NotFoundException('Спортсмен не найден');
+
+    const canDelete =
+      user?.role === 'admin' ||
+      (user?.role === 'coach' && athlete.group?.coach?.userId === user?.sub);
+
+    if (!canDelete) {
+      throw new ForbiddenException('Недостаточно прав для удаления спортсмена');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.competitionApproval.deleteMany({ where: { athleteId: id } });
+      await tx.competitionResult.deleteMany({ where: { athleteId: id } });
+      await tx.progressRecord.deleteMany({ where: { athleteId: id } });
+      await tx.attendance.deleteMany({ where: { athleteId: id } });
+      await tx.medicalDocument.deleteMany({ where: { athleteId: id } });
+      await tx.payment.deleteMany({ where: { athleteId: id } });
+      await tx.athleteParent.deleteMany({ where: { athleteId: id } });
+      await tx.athlete.delete({ where: { id } });
+    });
+
     return { success: true };
   }
 

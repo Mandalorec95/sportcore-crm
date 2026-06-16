@@ -54,8 +54,8 @@ export class AthletesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Архивировать спортсмена' })
+  @ApiOperation({ summary: 'Полностью удалить спортсмена' })
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.athletesService.remove(id, user.orgId);
+    return this.athletesService.remove(id, user.orgId, user);
   }
 }

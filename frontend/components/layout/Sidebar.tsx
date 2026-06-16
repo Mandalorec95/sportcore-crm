@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
   { href: '/payments', label: 'Оплаты', icon: CreditCard, roles: ['admin'] },
   { href: '/documents', label: 'Документы', icon: FileText, roles: ['admin', 'coach'] },
   { href: '/competitions', label: 'Соревнования', icon: Trophy, roles: ['admin', 'coach'] },
-  { href: '/notifications', label: 'Уведомления', icon: Bell, roles: ['admin', 'coach'] },
+  { href: '/notifications', label: 'Уведомления', icon: Bell, roles: ['admin', 'coach', 'parent'] },
   { href: '/users', label: 'Участники', icon: ShieldCheck, roles: ['admin'] },
   { href: '/api-keys', label: 'API / Интеграции', icon: Key, roles: ['admin'] },
   { href: '/admin-profile', label: 'Мой профиль', icon: UserCog, roles: ['admin', 'coach'] },

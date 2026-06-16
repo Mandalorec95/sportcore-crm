@@ -181,10 +181,13 @@ export default function AthletePassportPage() {
   const deleteAthleteMutation = useMutation({
     mutationFn: () => deleteAthlete(id),
     onSuccess: () => {
-      toast.success('Спортсмен удалён');
+      queryClient.invalidateQueries({ queryKey: ['athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      queryClient.removeQueries({ queryKey: ['athlete-passport', id] });
+      toast.success('Спортсмен успешно удалён');
       window.location.href = '/athletes';
     },
-    onError: () => toast.error('Ошибка при удалении'),
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Не удалось удалить спортсмена'),
   });
 
   const handleAddProgress = (e: React.FormEvent<HTMLFormElement>) => {
@@ -297,7 +300,7 @@ export default function AthletePassportPage() {
             </Button>
             <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="h-4 w-4 mr-1" />
-              Удалить
+              Удалить спортсмена полностью
             </Button>
           </div>
         </div>
@@ -677,8 +680,10 @@ export default function AthletePassportPage() {
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Удалить спортсмена?</DialogTitle></DialogHeader>
-          <p className="text-gray-500 text-sm">Это действие нельзя отменить. Все данные спортсмена будут удалены.</p>
+          <DialogHeader><DialogTitle>Удалить спортсмена полностью?</DialogTitle></DialogHeader>
+          <p className="text-gray-500 text-sm">
+            Вы уверены, что хотите полностью удалить спортсмена? Это действие удалит его данные из системы и отменить его будет нельзя.
+          </p>
           <div className="flex justify-end gap-3 mt-4">
             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Отмена</Button>
             <Button variant="destructive" onClick={() => deleteAthleteMutation.mutate()} disabled={deleteAthleteMutation.isPending}>

@@ -143,6 +143,9 @@ export const addCompetitionResult = (id: string, data: Record<string, unknown>) 
 export const getNotifications = () =>
   api.get('/notifications').then((r) => r.data);
 
+export const getNotificationRecipients = () =>
+  api.get('/notifications/recipients').then((r) => r.data);
+
 export const createNotification = (data: Record<string, unknown>) =>
   api.post('/notifications', data).then((r) => r.data);
 
@@ -179,8 +182,8 @@ export const updateGroup = (id: string, data: Record<string, unknown>) =>
 export const deleteGroup = (id: string) =>
   api.delete(`/groups/${id}`).then((r) => r.data);
 
-export const addGroupMember = (groupId: string, athleteId: string) =>
-  api.post(`/groups/${groupId}/members`, { athleteId }).then((r) => r.data);
+export const addGroupMember = (groupId: string, athleteIds: string | string[]) =>
+  api.post(`/groups/${groupId}/members`, Array.isArray(athleteIds) ? { athleteIds } : { athleteId: athleteIds }).then((r) => r.data);
 
 export const removeGroupMember = (groupId: string, athleteId: string) =>
   api.delete(`/groups/${groupId}/members/${athleteId}`).then((r) => r.data);
@@ -188,6 +191,9 @@ export const removeGroupMember = (groupId: string, athleteId: string) =>
 // Tasks
 export const getTasks = () =>
   api.get('/tasks').then((r) => r.data);
+
+export const getTask = (id: string) =>
+  api.get(`/tasks/${id}`).then((r) => r.data);
 
 export const createTask = (data: Record<string, unknown>) =>
   api.post('/tasks', data).then((r) => r.data);

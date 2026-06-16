@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { getAthletes, getGroups, createAthlete, getCoaches } from '@/lib/api';
+import { getAthletes, getGroups, createAthlete, getCoaches, deleteAthlete } from '@/lib/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Search, ChevronRight } from 'lucide-react';
+import { Plus, Search, ChevronRight, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Athlete {
@@ -76,6 +76,7 @@ export default function AthletesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [formGroupId, setFormGroupId] = useState('');
   const [formCoachId, setFormCoachId] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Athlete | null>(null);
 
   const { data: athletes = [], isLoading } = useQuery<Athlete[]>({
     queryKey: ['athletes', selectedGroup, selectedStatus],
@@ -104,6 +105,19 @@ export default function AthletesPage() {
       toast.success('Спортсмен добавлен');
     },
     onError: () => toast.error('Ошибка при создании спортсмена'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (athleteId: string) => deleteAthlete(athleteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      setDeleteTarget(null);
+      toast.success('Спортсмен успешно удалён');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Не удалось удалить спортсмена');
+    },
   });
 
   const filtered = athletes.filter((a) =>
@@ -248,8 +262,23 @@ export default function AthletesPage() {
                             ? `${Math.round(athlete.attendanceRate)}%`
                             : '—'}
                         </TableCell>
-                        <TableCell>
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              title="Удалить спортсмена полностью"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeleteTarget(athlete);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -319,6 +348,33 @@ export default function AthletesPage() {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Удалить спортсмена полностью?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-500">
+              Вы уверены, что хотите полностью удалить спортсмена? Это действие удалит его данные из системы и отменить его будет нельзя.
+            </p>
+            {deleteTarget && (
+              <p className="text-sm font-medium text-gray-900">{deleteTarget.fullName}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Удаление...' : 'Удалить'}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

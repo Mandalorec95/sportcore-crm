@@ -15,7 +15,13 @@ export class TasksController {
   @Get()
   @ApiOperation({ summary: 'Список задач' })
   findAll(@CurrentUser() user: any) {
-    return this.tasksService.findAll(user.orgId);
+    return this.tasksService.findAll(user.orgId, user);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Детали задачи' })
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.tasksService.findOne(id, user.orgId, user);
   }
 
   @Post()
@@ -27,7 +33,7 @@ export class TasksController {
   @Patch(':id')
   @ApiOperation({ summary: 'Обновить задачу' })
   update(@Param('id') id: string, @Body() dto: Partial<CreateTaskDto>, @CurrentUser() user: any) {
-    return this.tasksService.update(id, user.orgId, dto);
+    return this.tasksService.update(id, user.orgId, dto, user);
   }
 
   @Delete(':id')

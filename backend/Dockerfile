@@ -59,6 +59,10 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 COPY --from=builder /app/prisma.config.js ./prisma.config.js
 
+# Keep Prisma Client in sync with the copied schema in the runtime image
+RUN rm -rf ./node_modules/.prisma/client \
+  && npx prisma generate --schema=/app/prisma/schema.prisma
+
 # Create logs directory
 RUN mkdir -p ./logs
 

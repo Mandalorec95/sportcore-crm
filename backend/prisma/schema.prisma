@@ -61,6 +61,9 @@ enum MedalType {
 }
 
 enum NotificationType {
+  success
+  warning
+  danger
   payment_debt
   doc_expiring
   training
@@ -79,6 +82,7 @@ enum ApprovalStatus {
 enum TaskStatus {
   new
   in_progress
+  completed
   done
 }
 
@@ -145,8 +149,10 @@ model User {
   coach            Coach?
   parent           Parent?
   notifications    Notification[]        @relation("NotificationRecipient")
+  sentNotifications Notification[]       @relation("NotificationSender")
   attendances      Attendance[]          @relation("AttendanceCreator")
   tasks            Task[]                @relation("TaskCreator")
+  assignedTasks    Task[]                @relation("TaskAssignee")
   coachApprovals   CompetitionApproval[] @relation("ApprovalCoach")
 
   @@map("users")
@@ -378,14 +384,20 @@ model Notification {
   id          String           @id @default(uuid())
   orgId       String           @map("org_id")
   recipientId String           @map("recipient_id")
+  senderId    String?          @map("sender_id")
   type        NotificationType
   title       String
   message     String
   isRead      Boolean          @default(false) @map("is_read")
+  relatedTaskId String?        @map("related_task_id")
+  link        String?
   createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @default(now()) @updatedAt @map("updated_at")
 
   org       Organization @relation(fields: [orgId], references: [id])
   recipient User         @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  sender    User?        @relation("NotificationSender", fields: [senderId], references: [id])
+  relatedTask Task?      @relation(fields: [relatedTaskId], references: [id], onDelete: SetNull)
 
   @@map("notifications")
 }
@@ -410,6 +422,7 @@ model Task {
   id          String       @id @default(uuid())
   orgId       String       @map("org_id")
   createdById String       @map("created_by_id")
+  assignedToId String?     @map("assigned_to_id")
   title       String
   description String?
   dueDate     DateTime?    @map("due_date") @db.Date
@@ -420,6 +433,8 @@ model Task {
 
   org       Organization @relation(fields: [orgId], references: [id])
   createdBy User         @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedTo User?        @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  notifications Notification[]
 
   @@map("tasks")
 }

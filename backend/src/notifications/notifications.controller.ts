@@ -23,6 +23,12 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(user.sub);
   }
 
+  @Get('recipients')
+  @ApiOperation({ summary: 'Доступные получатели уведомлений' })
+  recipients(@CurrentUser() user: any) {
+    return this.notificationsService.getRecipients(user);
+  }
+
   @Patch(':id/read')
   @ApiOperation({ summary: 'Отметить прочитанным' })
   markRead(@Param('id') id: string, @CurrentUser() user: any) {
@@ -37,9 +43,11 @@ export class NotificationsController {
 
   @Post()
   @ApiOperation({ summary: 'Создать уведомление' })
-  create(@Body() body: { recipientId?: string; type: string; title: string; message: string }, @CurrentUser() user: any) {
-    const recipientId = body.recipientId || user.sub;
-    return this.notificationsService.create(user.orgId, recipientId, body.type, body.title, body.message);
+  create(
+    @Body() body: { recipientId?: string; type?: string; title?: string; message?: string; relatedTaskId?: string; link?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.notificationsService.createFromUser(user, body);
   }
 
   @Patch(':id')
