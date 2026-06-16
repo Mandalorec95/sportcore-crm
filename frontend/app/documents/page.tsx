@@ -52,9 +52,10 @@ interface Athlete {
 
 const DOC_TYPES = [
   { value: 'medical_cert', label: 'Медицинская справка' },
-  { value: 'insurance', label: 'Страховка' },
-  { value: 'parental_consent', label: 'Согласие родителей' },
 ];
+
+const MEDICAL_CERT_DOC_TYPE = 'medical_cert';
+const MEDICAL_CERT_LABEL = 'Медицинская справка';
 
 const DOCUMENT_STATUS_LABELS: Record<string, string> = {
   valid: 'действует действительно',
@@ -73,21 +74,13 @@ function getAthleteFullName(doc: MedDocument): string {
   return '—';
 }
 
-function getDocTypeLabel(docType?: string) {
-  const legacyLabels: Record<string, string> = {
-    medical_certificate: 'Медицинская справка',
-    consent: 'Согласие родителей',
-    passport_copy: 'Копия паспорта',
-  };
-  return DOC_TYPES.find((type) => type.value === docType)?.label ?? (docType ? legacyLabels[docType] ?? docType : '—');
-}
-
 export default function DocumentsPage() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [editDoc, setEditDoc] = useState<MedDocument | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [athleteSearch, setAthleteSearch] = useState('');
 
   const { data: allDocs = [], isLoading: allLoading } = useQuery<MedDocument[]>({
     queryKey: ['medical-documents'],
@@ -112,6 +105,7 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ['medical-documents'] });
       queryClient.invalidateQueries({ queryKey: ['expiring-docs'] });
       setShowCreate(false);
+      setAthleteSearch('');
       toast.success('Документ добавлен');
     },
     onError: () => toast.error('Ошибка при создании документа'),
@@ -143,9 +137,18 @@ export default function DocumentsPage() {
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const athlete = athletes.find(
+      (a) => a.id === athleteSearch || normalizeSearch(a.fullName) === normalizeSearch(athleteSearch),
+    );
+
+    if (!athlete) {
+      toast.error('Выберите ученика из списка');
+      return;
+    }
+
     createMutation.mutate({
-      athleteId: fd.get('athleteId') as string,
-      docType: fd.get('docType') as string,
+      athleteId: athlete.id,
+      docType: MEDICAL_CERT_DOC_TYPE,
       issuedAt: fd.get('issuedAt') as string,
       validUntil: fd.get('validUntil') as string,
     });
@@ -158,7 +161,7 @@ export default function DocumentsPage() {
     updateMutation.mutate({
       id: editDoc.id,
       data: {
-        docType: fd.get('docType') as string,
+        docType: MEDICAL_CERT_DOC_TYPE,
         issuedAt: fd.get('issuedAt') as string,
         validUntil: fd.get('validUntil') as string,
       },
@@ -175,14 +178,17 @@ export default function DocumentsPage() {
     return '';
   };
 
+  const isMedicalCertDoc = (doc: MedDocument) =>
+    !doc.docType || doc.docType === MEDICAL_CERT_DOC_TYPE || doc.docType === 'medical_certificate';
+
   const filterDocuments = (docs: MedDocument[]) => docs.filter((doc) => {
+    if (!isMedicalCertDoc(doc)) return false;
     if (!normalizedSearch) return true;
     const daysLeft = doc.validUntil ? getDaysLeft(doc.validUntil) : (doc.daysLeft ?? null);
     const searchable = [
       getAthleteFullName(doc),
       doc.athlete?.group?.name,
-      getDocTypeLabel(doc.docType),
-      doc.docType,
+      MEDICAL_CERT_LABEL,
       doc.issuedAt,
       doc.validUntil,
       daysLeft,
@@ -213,7 +219,6 @@ export default function DocumentsPage() {
               <TableRow>
                 <TableHead>Спортсмен</TableHead>
                 <TableHead>Группа</TableHead>
-                <TableHead>Тип документа</TableHead>
                 <TableHead>Выдан</TableHead>
                 <TableHead>Действует до</TableHead>
                 <TableHead>Дней осталось</TableHead>
@@ -229,7 +234,6 @@ export default function DocumentsPage() {
                   <TableRow key={doc.id} className={rowClass}>
                     <TableCell className="font-medium">{getAthleteFullName(doc)}</TableCell>
                     <TableCell>{doc.athlete?.group?.name || '—'}</TableCell>
-                    <TableCell>{getDocTypeLabel(doc.docType)}</TableCell>
                     <TableCell>{formatDate(doc.issuedAt)}</TableCell>
                     <TableCell>{formatDate(doc.validUntil)}</TableCell>
                     <TableCell>
@@ -295,9 +299,9 @@ export default function DocumentsPage() {
         <Tabs defaultValue="all">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <TabsList>
-              <TabsTrigger value="all">Все документы ({allDocs.length})</TabsTrigger>
+              <TabsTrigger value="all">Все справки ({filteredAllDocs.length})</TabsTrigger>
               <TabsTrigger value="expiring" className="text-yellow-600">
-                Требуют внимания ({expiringDocs.length})
+                Требуют внимания ({filteredExpiringDocs.length})
               </TabsTrigger>
             </TabsList>
             <div className="relative w-full md:max-w-sm">
@@ -305,7 +309,7 @@ export default function DocumentsPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск по спортсмену, группе, документу..."
+                placeholder="Поиск по ученику или группе..."
                 className="pl-9"
               />
             </div>
@@ -321,27 +325,31 @@ export default function DocumentsPage() {
         </Tabs>
 
         {/* Create Dialog */}
-        <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <Dialog
+          open={showCreate}
+          onOpenChange={(open) => {
+            setShowCreate(open);
+            if (!open) setAthleteSearch('');
+          }}
+        >
           <DialogContent>
             <DialogHeader><DialogTitle>Добавить документ</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1">
-                <Label>Спортсмен *</Label>
-                <select name="athleteId" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                  <option value="">Выберите спортсмена...</option>
+                <Label htmlFor="athleteSearch">Ученик *</Label>
+                <Input
+                  id="athleteSearch"
+                  list="medical-document-athletes"
+                  value={athleteSearch}
+                  onChange={(e) => setAthleteSearch(e.target.value)}
+                  placeholder="Начните вводить имя или фамилию"
+                  required
+                />
+                <datalist id="medical-document-athletes">
                   {athletes.map((a) => (
-                    <option key={a.id} value={a.id}>{a.fullName}</option>
+                    <option key={a.id} value={a.fullName} />
                   ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label>Тип документа *</Label>
-                <select name="docType" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                  <option value="">Выберите тип...</option>
-                  {DOC_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
+                </datalist>
               </div>
               <div className="space-y-1">
                 <Label>Дата выдачи</Label>
@@ -367,14 +375,6 @@ export default function DocumentsPage() {
             <DialogHeader><DialogTitle>Редактировать документ</DialogTitle></DialogHeader>
             {editDoc && (
               <form onSubmit={handleUpdate} className="space-y-4">
-                <div className="space-y-1">
-                  <Label>Тип документа</Label>
-                  <select name="docType" defaultValue={editDoc.docType || ''} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                    {DOC_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="space-y-1">
                   <Label>Дата выдачи</Label>
                   <Input name="issuedAt" type="date" defaultValue={editDoc.issuedAt ? editDoc.issuedAt.split('T')[0] : ''} />
