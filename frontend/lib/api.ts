@@ -76,6 +76,9 @@ export const getGroup = (id: string) =>
 export const getSessions = (params?: { groupId?: string; date?: string }) =>
   api.get('/sessions', { params }).then((r) => r.data);
 
+export const createSession = (data: Record<string, unknown>) =>
+  api.post('/sessions', data).then((r) => r.data);
+
 export const getSessionAttendance = (sessionId: string) =>
   api.get(`/sessions/${sessionId}/attendance`).then((r) => r.data);
 
@@ -231,6 +234,9 @@ export const getCompetitionApprovals = (competitionId: string) =>
 
 export const upsertCompetitionApproval = (competitionId: string, athleteId: string, status: string) =>
   api.post(`/competitions/${competitionId}/approvals`, { athleteId, status }).then((r) => r.data);
+
+export const setCompetitionParticipants = (competitionId: string, athleteIds: string[]) =>
+  api.post(`/competitions/${competitionId}/participants`, { athleteIds }).then((r) => r.data);
 
 export const respondToApproval = (competitionId: string, athleteId: string, status: 'approved' | 'rejected', comment?: string) =>
   api.patch(`/competitions/${competitionId}/approvals/${athleteId}/respond`, { status, comment }).then((r) => r.data);

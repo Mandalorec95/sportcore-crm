@@ -7,11 +7,19 @@ export class CompetitionsService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(orgId: string) {
-    return this.prisma.competition.findMany({
+    const competitions = await this.prisma.competition.findMany({
       where: { orgId },
-      include: { _count: { select: { results: true } } },
+      include: {
+        _count: { select: { results: true } },
+        approvals: { where: { status: 'approved' }, select: { id: true } },
+      },
       orderBy: { compDate: 'desc' },
     });
+
+    return competitions.map(({ approvals, ...competition }) => ({
+      ...competition,
+      participantCount: approvals.length,
+    }));
   }
 
   async findOne(id: string, orgId: string) {
@@ -21,6 +29,10 @@ export class CompetitionsService {
         results: {
           include: { athlete: { select: { id: true, firstName: true, lastName: true } } },
           orderBy: { place: 'asc' },
+        },
+        approvals: {
+          include: { athlete: { select: { id: true, firstName: true, lastName: true } } },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -75,8 +87,39 @@ export class CompetitionsService {
     });
   }
 
-  async upsertApproval(competitionId: string, athleteId: string, coachId: string, orgId: string, status: string) {
+  async setParticipants(competitionId: string, athleteIds: string[], coachId: string, orgId: string) {
     await this.findOne(competitionId, orgId);
+
+    const uniqueAthleteIds = [...new Set(athleteIds.filter(Boolean))];
+    const athletes = await this.prisma.athlete.findMany({
+      where: { id: { in: uniqueAthleteIds }, orgId, status: { not: 'archived' } },
+      select: { id: true },
+    });
+    const validAthleteIds = athletes.map((a) => a.id);
+
+    await this.prisma.competitionApproval.deleteMany({
+      where: {
+        competitionId,
+        orgId,
+        athleteId: { notIn: validAthleteIds },
+      },
+    });
+
+    await Promise.all(
+      validAthleteIds.map((athleteId) =>
+        this.prisma.competitionApproval.upsert({
+          where: { competitionId_athleteId: { competitionId, athleteId } },
+          update: { status: 'approved', coachId },
+          create: { competitionId, athleteId, coachId, orgId, status: 'approved' },
+        }),
+      ),
+    );
+
+    return this.getApprovals(competitionId, orgId);
+  }
+
+  async upsertApproval(competitionId: string, athleteId: string, coachId: string, orgId: string, status: string) {
+    const comp = await this.findOne(competitionId, orgId);
 
     const approval = await this.prisma.competitionApproval.upsert({
       where: { competitionId_athleteId: { competitionId, athleteId } },
@@ -86,7 +129,6 @@ export class CompetitionsService {
     });
 
     if (status === 'pending') {
-      const comp = await this.prisma.competition.findFirst({ where: { id: competitionId } });
       const parents = approval.athlete.athleteParents.map((ap) => ap.parent.user);
       await Promise.all(
         parents.map((pu) =>
@@ -96,7 +138,7 @@ export class CompetitionsService {
               recipientId: pu.id,
               type: 'competition_approval',
               title: 'Запрос на участие в соревновании',
-              message: `Тренер запрашивает ваше согласие на участие ${approval.athlete.firstName} ${approval.athlete.lastName} в соревновании "${comp?.name}". Пожалуйста, подтвердите или отклоните.`,
+              message: `Тренер запрашивает ваше согласие на участие ${approval.athlete.firstName} ${approval.athlete.lastName} в соревновании "${comp.name}". Пожалуйста, подтвердите или отклоните.`,
             },
           }),
         ),

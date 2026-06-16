@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCompetitions, getCompetition, createCompetition, updateCompetition, deleteCompetition, addCompetitionResult, getAthletes, getAthletesReadiness, getCompetitionApprovals, upsertCompetitionApproval } from '@/lib/api';
+import { getCompetitions, getCompetition, createCompetition, updateCompetition, deleteCompetition, addCompetitionResult, getAthletes, getAthletesReadiness, getCompetitionApprovals, setCompetitionParticipants } from '@/lib/api';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -25,9 +25,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Trophy, Calendar, MapPin, ChevronRight, Plus, Edit, Trash2, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Trophy, Calendar, MapPin, ChevronRight, Plus, Edit, Trash2, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { formatDate } from '@/lib/utils';
 
 interface Competition {
   id: string;
@@ -38,6 +40,7 @@ interface Competition {
   description?: string;
   sportType?: string;
   _count?: { results: number };
+  participantCount?: number;
   results?: Array<{
     id: string;
     athlete?: { id?: string; firstName?: string; lastName?: string };
@@ -46,6 +49,7 @@ interface Competition {
     place?: number;
     medal?: string;
   }>;
+  approvals?: Approval[];
 }
 
 function getCompDate(comp: Competition) {
@@ -83,17 +87,16 @@ const READINESS_COLORS: Record<string, string> = {
   red: 'bg-red-100 text-red-700 border-red-200',
 };
 
+const READINESS_ROW_COLORS: Record<string, string> = {
+  green: 'bg-green-50 border-green-200 hover:bg-green-100',
+  yellow: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100',
+  red: 'bg-red-50 border-red-200 hover:bg-red-100',
+};
+
 const READINESS_LABELS: Record<string, string> = {
   green: 'Готов',
   yellow: 'Условно',
   red: 'Не готов',
-};
-
-const APPROVAL_LABELS: Record<string, string> = {
-  pending: 'Ожидает',
-  approved: 'Согласовано',
-  rejected: 'Отказ',
-  allowed_without_consent: 'Допущен',
 };
 
 export default function CompetitionsPage() {
@@ -104,6 +107,8 @@ export default function CompetitionsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showAddResult, setShowAddResult] = useState(false);
   const [resultAthleteId, setResultAthleteId] = useState('');
+  const [participantCompetitionId, setParticipantCompetitionId] = useState<string | null>(null);
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
 
   const { data: competitions = [], isLoading } = useQuery<Competition[]>({
     queryKey: ['competitions'],
@@ -118,10 +123,12 @@ export default function CompetitionsPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => createCompetition(data),
-    onSuccess: () => {
+    onSuccess: (created: Competition) => {
       queryClient.invalidateQueries({ queryKey: ['competitions'] });
       setShowCreate(false);
       toast.success('Соревнование создано');
+      setParticipantCompetitionId(created.id);
+      setSelectedParticipantIds([]);
     },
     onError: () => toast.error('Ошибка при создании'),
   });
@@ -176,15 +183,51 @@ export default function CompetitionsPage() {
     enabled: !!selectedId,
   });
 
-  const approvalMutation = useMutation({
-    mutationFn: ({ athleteId, status }: { athleteId: string; status: string }) =>
-      upsertCompetitionApproval(selectedId!, athleteId, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['competition-approvals', selectedId] });
-      toast.success('Статус допуска обновлён');
-    },
-    onError: () => toast.error('Ошибка при обновлении допуска'),
+  const { data: participantApprovals = [] } = useQuery<Approval[]>({
+    queryKey: ['competition-participants', participantCompetitionId],
+    queryFn: () => getCompetitionApprovals(participantCompetitionId!),
+    enabled: !!participantCompetitionId,
   });
+
+  useEffect(() => {
+    if (!participantCompetitionId) return;
+    setSelectedParticipantIds(
+      participantApprovals
+        .filter((approval) => approval.status === 'approved')
+        .map((approval) => approval.athleteId),
+    );
+  }, [participantApprovals, participantCompetitionId]);
+
+  const participantsMutation = useMutation({
+    mutationFn: ({ competitionId, athleteIds }: { competitionId: string; athleteIds: string[] }) =>
+      setCompetitionParticipants(competitionId, athleteIds),
+    onSuccess: () => {
+      if (participantCompetitionId) {
+        queryClient.invalidateQueries({ queryKey: ['competition-participants', participantCompetitionId] });
+        queryClient.invalidateQueries({ queryKey: ['competition', participantCompetitionId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['competitions'] });
+      setParticipantCompetitionId(null);
+      toast.success('Участники сохранены');
+    },
+    onError: () => toast.error('Ошибка при сохранении участников'),
+  });
+
+  const toggleParticipant = (athleteId: string) => {
+    setSelectedParticipantIds((current) =>
+      current.includes(athleteId)
+        ? current.filter((id) => id !== athleteId)
+        : [...current, athleteId],
+    );
+  };
+
+  const openParticipantSelector = (competitionId: string) => {
+    setSelectedParticipantIds([]);
+    setParticipantCompetitionId(competitionId);
+  };
+
+  const participantRows = readiness;
+  const detailParticipants = (detail?.approvals ?? approvals).filter((approval) => approval.status === 'approved');
 
   const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -257,11 +300,7 @@ export default function CompetitionsPage() {
                           {getCompDate(comp) && (
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3.5 w-3.5" />
-                              {new Date(getCompDate(comp)).toLocaleDateString('ru-RU', {
-                                day: 'numeric',
-                                month: 'long',
-                                year: 'numeric',
-                              })}
+                              {formatDate(getCompDate(comp))}
                             </span>
                           )}
                           {comp.location && (
@@ -278,6 +317,17 @@ export default function CompetitionsPage() {
                       {comp._count?.results != null && (
                         <Badge variant="outline">{comp._count.results} результатов</Badge>
                       )}
+                      {comp.participantCount != null && (
+                        <Badge variant="outline">{comp.participantCount} участников</Badge>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => { e.stopPropagation(); openParticipantSelector(comp.id); }}
+                      >
+                        <Users className="h-4 w-4 mr-1" />
+                        Участники
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -317,11 +367,7 @@ export default function CompetitionsPage() {
                   {getCompDate(selected) && (
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3.5 w-3.5" />
-                      {new Date(getCompDate(selected)).toLocaleDateString('ru-RU', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
+                      {formatDate(getCompDate(selected))}
                     </span>
                   )}
                   {selected.location && (
@@ -346,7 +392,7 @@ export default function CompetitionsPage() {
               <Tabs defaultValue="results" className="mt-3">
                 <TabsList className="w-full">
                   <TabsTrigger value="results" className="flex-1">Результаты</TabsTrigger>
-                  <TabsTrigger value="readiness" className="flex-1">Готовность</TabsTrigger>
+                  <TabsTrigger value="participants" className="flex-1">Участники</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="results">
@@ -405,63 +451,134 @@ export default function CompetitionsPage() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="readiness">
+                <TabsContent value="participants">
+                  <div className="flex items-center justify-between mt-2 mb-2">
+                    <span className="text-sm text-gray-500">{detailParticipants.length} участников</span>
+                    {selectedId && (
+                      <Button size="sm" variant="outline" onClick={() => openParticipantSelector(selectedId)}>
+                        <Users className="h-3.5 w-3.5 mr-1" />
+                        Выбрать участников
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400 mt-2 mb-3">
                     Готовность: <span className="text-green-600">Зелёный</span> — посещ. ≥80% и оценка ≥4 · <span className="text-yellow-600">Жёлтый</span> — 50–79% или 3–3.9 · <span className="text-red-600">Красный</span> — &lt;50% или &lt;3
                   </p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {readiness.map((r) => {
-                      const approval = approvals.find((a) => a.athleteId === r.id);
-                      return (
-                        <div key={r.id} className="flex items-center gap-3 p-2 rounded-lg border bg-white">
-                          <Badge className={`text-xs border ${READINESS_COLORS[r.readiness]}`} variant="outline">
-                            {READINESS_LABELS[r.readiness]}
-                          </Badge>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{r.fullName}</div>
-                            <div className="text-xs text-gray-400">
-                              Посещ.: {r.rate}%
-                              {r.avgGrade != null ? ` · Оценка: ${r.avgGrade}` : ''}
+                  {detailParticipants.length > 0 ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {detailParticipants.map((participant) => {
+                        const fullName = participant.athlete
+                          ? `${participant.athlete.firstName} ${participant.athlete.lastName}`.trim()
+                          : participant.athleteId;
+                        const readinessInfo = readiness.find((item) => item.id === participant.athleteId);
+                        return (
+                          <div
+                            key={participant.athleteId}
+                            className={`flex items-center gap-3 rounded-lg border p-3 ${readinessInfo ? READINESS_ROW_COLORS[readinessInfo.readiness] : 'bg-white'}`}
+                          >
+                            {readinessInfo && (
+                              <Badge className={`text-xs border ${READINESS_COLORS[readinessInfo.readiness]}`} variant="outline">
+                                {READINESS_LABELS[readinessInfo.readiness]}
+                              </Badge>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium truncate">{fullName}</div>
+                              {readinessInfo && (
+                                <div className="text-xs text-gray-500">
+                                  Посещ.: {readinessInfo.rate}%
+                                  {readinessInfo.avgGrade != null ? ` · Оценка: ${readinessInfo.avgGrade}` : ''}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {approval ? (
-                              <Badge variant="outline" className="text-xs">
-                                {APPROVAL_LABELS[approval.status] ?? approval.status}
-                              </Badge>
-                            ) : null}
-                            <button
-                              title="Допустить (запрос согласия)"
-                              onClick={() => approvalMutation.mutate({ athleteId: r.id, status: 'pending' })}
-                              className="p-1 rounded text-green-600 hover:bg-green-50"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </button>
-                            <button
-                              title="Допустить без согласия родителей"
-                              onClick={() => approvalMutation.mutate({ athleteId: r.id, status: 'allowed_without_consent' })}
-                              className="p-1 rounded text-blue-600 hover:bg-blue-50"
-                            >
-                              <ShieldAlert className="h-4 w-4" />
-                            </button>
-                            <button
-                              title="Отклонить"
-                              onClick={() => approvalMutation.mutate({ athleteId: r.id, status: 'rejected' })}
-                              className="p-1 rounded text-red-500 hover:bg-red-50"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {readiness.length === 0 && (
-                      <div className="text-center text-gray-400 py-6 text-sm">Нет спортсменов</div>
-                    )}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-400 py-8">
+                      <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p>Участники ещё не выбраны</p>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Participants Dialog */}
+        <Dialog
+          open={!!participantCompetitionId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setParticipantCompetitionId(null);
+              setSelectedParticipantIds([]);
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[82vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Выбрать участников соревнования</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-xs text-gray-400">
+                Зелёный — хорошие показатели, жёлтый — средние или спорные, красный — слабые. Цвет рассчитан по посещаемости и оценкам.
+              </p>
+              <div className="space-y-2">
+                {participantRows.map((athlete) => {
+                  const checked = selectedParticipantIds.includes(athlete.id);
+                  return (
+                    <div
+                      key={athlete.id}
+                      className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${READINESS_ROW_COLORS[athlete.readiness]}`}
+                    >
+                      <Checkbox checked={checked} onCheckedChange={() => toggleParticipant(athlete.id)} />
+                      <Badge className={`text-xs border ${READINESS_COLORS[athlete.readiness]}`} variant="outline">
+                        {READINESS_LABELS[athlete.readiness]}
+                      </Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{athlete.fullName}</div>
+                        <div className="text-xs text-gray-500">
+                          Посещ.: {athlete.rate}%
+                          {athlete.avgGrade != null ? ` · Оценка: ${athlete.avgGrade}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {participantRows.length === 0 && (
+                  <div className="text-center text-gray-400 py-8 text-sm">Нет учеников</div>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t pt-4">
+                <span className="text-sm text-gray-500">Выбрано: {selectedParticipantIds.length}</span>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setParticipantCompetitionId(null);
+                      setSelectedParticipantIds([]);
+                    }}
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!participantCompetitionId || participantsMutation.isPending}
+                    onClick={() => {
+                      if (!participantCompetitionId) return;
+                      participantsMutation.mutate({
+                        competitionId: participantCompetitionId,
+                        athleteIds: selectedParticipantIds,
+                      });
+                    }}
+                  >
+                    {participantsMutation.isPending ? 'Сохранение...' : 'Сохранить участников'}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 

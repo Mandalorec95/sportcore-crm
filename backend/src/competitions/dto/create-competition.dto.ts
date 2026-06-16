@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CreateCompetitionDto {
   @ApiProperty() @IsString() name: string;
@@ -17,4 +17,11 @@ export class CreateResultDto {
   @ApiPropertyOptional() @IsOptional() @IsString() result?: string;
   @ApiPropertyOptional() @IsOptional() medal?: 'gold' | 'silver' | 'bronze' | 'none';
   @ApiPropertyOptional() @IsOptional() @IsString() coachComment?: string;
+}
+
+export class SetCompetitionParticipantsDto {
+  @ApiProperty({ type: [String], example: ['ath-001', 'ath-002'] })
+  @IsArray()
+  @IsString({ each: true })
+  athleteIds: string[];
 }

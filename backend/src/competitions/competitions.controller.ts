@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CompetitionsService } from './competitions.service';
-import { CreateCompetitionDto, CreateResultDto } from './dto/create-competition.dto';
+import { CreateCompetitionDto, CreateResultDto, SetCompetitionParticipantsDto } from './dto/create-competition.dto';
 
 @ApiTags('competitions')
 @ApiBearerAuth()
@@ -60,10 +60,20 @@ export class CompetitionsController {
     return this.competitionsService.getApprovals(id, user.orgId);
   }
 
+  @Post('competitions/:id/participants')
+  @ApiOperation({ summary: 'Сохранить участников соревнования' })
+  setParticipants(
+    @Param('id') id: string,
+    @Body() body: SetCompetitionParticipantsDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.competitionsService.setParticipants(id, body.athleteIds, user.sub, user.orgId);
+  }
+
   @Post('competitions/:id/approvals')
   @ApiOperation({ summary: 'Создать/обновить запрос допуска' })
   upsertApproval(@Param('id') id: string, @Body() body: { athleteId: string; status: string }, @CurrentUser() user: any) {
-    return this.competitionsService.upsertApproval(id, body.athleteId, user.id, user.orgId, body.status);
+    return this.competitionsService.upsertApproval(id, body.athleteId, user.sub, user.orgId, body.status);
   }
 
   @Patch('competitions/:id/approvals/:athleteId/respond')
@@ -74,12 +84,12 @@ export class CompetitionsController {
     @Body() body: { status: 'approved' | 'rejected'; comment?: string },
     @CurrentUser() user: any,
   ) {
-    return this.competitionsService.parentRespond(id, athleteId, user.id, body.status, body.comment);
+    return this.competitionsService.parentRespond(id, athleteId, user.sub, body.status, body.comment);
   }
 
   @Get('parent/competition-approvals')
   @ApiOperation({ summary: 'Запросы допуска для родителя' })
   getParentApprovals(@CurrentUser() user: any) {
-    return this.competitionsService.getParentApprovals(user.id, user.orgId);
+    return this.competitionsService.getParentApprovals(user.sub, user.orgId);
   }
 }
