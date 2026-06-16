@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
@@ -92,9 +92,37 @@ export class UsersService {
     });
   }
 
-  async remove(userId: string, orgId: string) {
+  async remove(userId: string, orgId: string, currentUserId?: string) {
+    if (userId === currentUserId) {
+      throw new BadRequestException('Нельзя удалить свою учётную запись');
+    }
+
     const user = await this.prisma.user.findFirst({ where: { id: userId, orgId } });
     if (!user) throw new NotFoundException('Пользователь не найден');
-    return this.prisma.user.delete({ where: { id: userId } });
+
+    return this.prisma.$transaction(async (tx) => {
+      const coach = await tx.coach.findUnique({ where: { userId } });
+      if (coach) {
+        await tx.trainingGroup.updateMany({ where: { coachId: coach.id }, data: { coachId: null } });
+        await tx.trainingSession.updateMany({ where: { coachId: coach.id }, data: { coachId: null } });
+        await tx.progressRecord.updateMany({ where: { coachId: coach.id }, data: { coachId: null } });
+        await tx.coach.delete({ where: { id: coach.id } });
+      }
+
+      const parent = await tx.parent.findUnique({ where: { userId } });
+      if (parent) {
+        await tx.athleteParent.deleteMany({ where: { parentId: parent.id } });
+        await tx.parent.delete({ where: { id: parent.id } });
+      }
+
+      await tx.attendance.updateMany({ where: { createdBy: userId }, data: { createdBy: null } });
+      await tx.competitionApproval.deleteMany({ where: { coachId: userId } });
+      await tx.notification.updateMany({ where: { senderId: userId }, data: { senderId: null } });
+      await tx.notification.deleteMany({ where: { recipientId: userId } });
+      await tx.task.updateMany({ where: { assignedToId: userId }, data: { assignedToId: null } });
+      await tx.task.deleteMany({ where: { createdById: userId } });
+
+      return tx.user.delete({ where: { id: userId } });
+    });
   }
 }

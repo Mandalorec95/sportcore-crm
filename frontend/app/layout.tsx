@@ -33,7 +33,7 @@ export default function RootLayout({
       <body className="min-h-full bg-gray-50">
         <QueryClientProvider client={queryClient}>
           {children}
-          <Toaster richColors position="top-right" />
+          <Toaster richColors position="bottom-right" />
         </QueryClientProvider>
       </body>
     </html>

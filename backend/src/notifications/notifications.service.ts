@@ -13,7 +13,13 @@ export class NotificationsService {
 
   async findForUser(userId: string, orgId: string) {
     return this.prisma.notification.findMany({
-      where: { recipientId: userId, orgId },
+      where: {
+        orgId,
+        OR: [
+          { recipientId: userId },
+          { senderId: userId },
+        ],
+      },
       include: this.includePeople,
       orderBy: [{ isRead: 'asc' }, { createdAt: 'desc' }],
       take: 50,
@@ -136,8 +142,32 @@ export class NotificationsService {
       throw new ForbiddenException('Родитель может только просматривать уведомления');
     }
 
-    const recipientId = body.recipientId || user.sub;
     const allowedRecipients = await this.getRecipients(user);
+
+    if (body.recipientId === 'all') {
+      if (allowedRecipients.length === 0) {
+        throw new ForbiddenException('Нет доступных получателей для отправки');
+      }
+
+      const notifications = await Promise.all(
+        allowedRecipients.map((recipient) =>
+          this.create(
+            user.orgId,
+            recipient.id,
+            body.type || 'warning',
+            body.title || 'Уведомление',
+            body.message || '',
+            user.sub,
+            body.relatedTaskId,
+            body.link,
+          ),
+        ),
+      );
+
+      return { count: notifications.length, notifications };
+    }
+
+    const recipientId = body.recipientId || user.sub;
     const canSendToRecipient = allowedRecipients.some((recipient) => recipient.id === recipientId);
     if (!canSendToRecipient && recipientId !== user.sub) {
       throw new ForbiddenException('Недостаточно прав для отправки этому получателю');

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 
@@ -35,12 +35,13 @@ export class PaymentsService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const totalDebt = payments.reduce((sum, p) => sum + (p.amount - p.paidAmount), 0);
+    const debtPayments = payments.filter((p) => p.amount - p.paidAmount > 0);
+    const totalDebt = debtPayments.reduce((sum, p) => sum + (p.amount - p.paidAmount), 0);
 
     return {
       totalDebt,
-      count: payments.length,
-      debtors: payments.map((p) => ({
+      count: debtPayments.length,
+      debtors: debtPayments.map((p) => ({
         paymentId: p.id,
         athleteId: p.athleteId,
         fullName: `${p.athlete.firstName} ${p.athlete.lastName}`,
@@ -89,7 +90,12 @@ export class PaymentsService {
     const payment = await this.prisma.payment.findFirst({ where: { id, orgId } });
     if (!payment) throw new NotFoundException('Платёж не найден');
 
-    const newPaid = paidAmount ?? payment.amount;
+    const paymentAmount = paidAmount ?? (payment.amount - payment.paidAmount);
+    if (paymentAmount <= 0) {
+      throw new BadRequestException('Введите корректную сумму оплаты');
+    }
+
+    const newPaid = Math.min(payment.amount, payment.paidAmount + paymentAmount);
     const status = newPaid >= payment.amount ? 'paid' : 'partial';
 
     return this.prisma.payment.update({

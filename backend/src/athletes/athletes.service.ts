@@ -52,7 +52,13 @@ export class AthletesService {
     const totalSessions = await this.prisma.trainingSession.count({
       where: { groupId: athlete.groupId ?? undefined, status: 'completed' },
     });
-    const attended = athlete.attendances.filter((a) => a.status === 'present' || a.status === 'late').length;
+    const attended = await this.prisma.attendance.count({
+      where: {
+        athleteId: id,
+        status: { in: ['present', 'late'] },
+        ...(athlete.groupId ? { session: { groupId: athlete.groupId } } : {}),
+      },
+    });
     const attendanceRate = totalSessions > 0 ? Math.round((attended / totalSessions) * 100) : 0;
 
     const debtPayment = athlete.payments.find((p) => p.status === 'debt' || p.status === 'partial');

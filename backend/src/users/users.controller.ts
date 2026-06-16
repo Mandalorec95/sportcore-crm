@@ -60,6 +60,6 @@ export class UsersController {
   @Delete(':id')
   @ApiOperation({ summary: 'Удалить пользователя' })
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.usersService.remove(id, user.orgId);
+    return this.usersService.remove(id, user.orgId, user.sub);
   }
 }

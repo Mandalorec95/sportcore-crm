@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { NotificationListener } from '@/components/NotificationListener';
 import {
   Activity,
   Users,
@@ -448,6 +449,7 @@ export default function ParentPage() {
           </div>
         )}
       </main>
+      {user && <NotificationListener user={user} />}
     </div>
   );
 }

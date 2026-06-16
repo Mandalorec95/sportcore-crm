@@ -1,6 +1,7 @@
 'use client';
 
 import { useRequireAuth } from '@/hooks/useAuth';
+import { NotificationListener } from '@/components/NotificationListener';
 import { Sidebar } from './Sidebar';
 
 interface MainLayoutProps {
@@ -27,6 +28,7 @@ export function MainLayout({ children, allowedRoles }: MainLayoutProps) {
       <main className="flex-1 overflow-auto md:pl-0 pt-14 md:pt-0">
         {children}
       </main>
+      <NotificationListener user={user} />
     </div>
   );
 }

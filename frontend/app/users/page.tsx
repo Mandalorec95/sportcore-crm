@@ -99,7 +99,7 @@ export default function UsersPage() {
       setDeleteId(null);
       toast.success('Пользователь удалён');
     },
-    onError: () => toast.error('Ошибка при удалении'),
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Ошибка при удалении'),
   });
 
   const genPasswordMutation = useMutation({

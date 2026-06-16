@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -74,6 +74,11 @@ interface Notification {
   recipient?: Person | null;
   relatedTaskId?: string | null;
   link?: string | null;
+}
+
+interface NotificationCreateResult extends Notification {
+  count?: number;
+  notifications?: Notification[];
 }
 
 interface Task {
@@ -217,8 +222,6 @@ export default function NotificationsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [sort, setSort] = useState<NotificationSort>('default');
-  const seenNotificationIds = useRef<Set<string>>(new Set());
-  const initializedNotifications = useRef(false);
 
   const { data: notifications = [], isLoading: notifsLoading } = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -237,28 +240,6 @@ export default function NotificationsPage() {
     queryFn: getTasks,
   });
 
-  useEffect(() => {
-    if (!notifications.length) return;
-
-    if (!initializedNotifications.current) {
-      notifications.forEach((notification) => seenNotificationIds.current.add(notification.id));
-      initializedNotifications.current = true;
-      return;
-    }
-
-    notifications.forEach((notification) => {
-      if (seenNotificationIds.current.has(notification.id)) return;
-      seenNotificationIds.current.add(notification.id);
-      if (notification.isRead) return;
-
-      const tone = getTone(notification.type);
-      const message = notification.message || '';
-      if (tone === 'success') toast.success(notification.title || 'Новое уведомление', { description: message });
-      else if (tone === 'danger') toast.error(notification.title || 'Новое уведомление', { description: message });
-      else toast.warning(notification.title || 'Новое уведомление', { description: message });
-    });
-  }, [notifications]);
-
   const markReadMutation = useMutation({
     mutationFn: (id: string) => markNotificationRead(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
@@ -267,16 +248,20 @@ export default function NotificationsPage() {
 
   const createNotifMutation = useMutation({
     mutationFn: createNotification,
-    onSuccess: (notification: Notification) => {
+    onSuccess: (result: NotificationCreateResult) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setShowCreateNotification(false);
       setNotificationRecipientId('');
+      const notification = result.notifications?.[0] ?? result;
+      const description = result.count
+        ? `Отправлено получателей: ${result.count}`
+        : notification.message;
       const tone = getTone(notification.type);
-      if (tone === 'success') toast.success(notification.title || 'Уведомление отправлено', { description: notification.message });
-      else if (tone === 'danger') toast.error(notification.title || 'Уведомление отправлено', { description: notification.message });
-      else toast.warning(notification.title || 'Уведомление отправлено', { description: notification.message });
+      if (tone === 'success') toast.success(notification.title || 'Уведомление отправлено', { description });
+      else if (tone === 'danger') toast.error(notification.title || 'Уведомление отправлено', { description });
+      else toast.warning(notification.title || 'Уведомление отправлено', { description });
     },
-    onError: () => toast.error('Ошибка при отправке уведомления'),
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Ошибка при отправке уведомления'),
   });
 
   const deleteNotifMutation = useMutation({
@@ -673,6 +658,7 @@ export default function NotificationsPage() {
                 <Select modal={false} value={notificationRecipientId} onValueChange={(v) => setNotificationRecipientId(v ?? '')}>
                   <SelectTrigger><SelectValue placeholder="Выберите получателя" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">Все пользователи платформы</SelectItem>
                     {recipients.map((recipient) => (
                       <SelectItem key={recipient.id} value={recipient.id}>
                         {recipient.fullName} · {roleLabels[recipient.role || ''] || recipient.role}
